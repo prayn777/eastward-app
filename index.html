@@ -835,13 +835,40 @@ function renderTodo(){
   let h=`<div class="todo-section"><div class="sec-title">🛒 待購買清單（外出採購用）</div>`;
   w.forEach(c=>{
     h+=`<div class="todo-card"><div class="todo-shop">🏪 ${c.name} <span style="color:var(--text3);font-weight:400">・${c.stage}</span></div>`;
-    c.undoneBuys.forEach(b=>h+=`<div class="todo-item"><div class="chk" onclick="toggleChk(this)"></div><span>${b.text}</span></div>`);
+    c.undoneBuys.forEach(b=>{
+      const safeText=b.text.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      h+=`<div class="todo-item"><div class="chk" onclick="toggleBuyItem(this,'${c.id}','${safeText}')"></div><span>${b.text}</span></div>`;
+    });
     h+=`</div>`;
   });
   h+=`</div>`;
   con.innerHTML=h;
 }
 function toggleChk(el){el.classList.toggle('done');el.textContent=el.classList.contains('done')?'✓':'';el.nextElementSibling?.classList.toggle('done-txt');}
+
+async function toggleBuyItem(el,cardId,itemText){
+  // Visual feedback immediately
+  el.classList.add('done');
+  el.textContent='✓';
+  el.nextElementSibling?.classList.add('done-txt');
+  el.onclick=null; // prevent double click
+
+  // Find the card and mark this buy item as done
+  const card=cards.find(c=>c.id===cardId);
+  if(!card)return;
+
+  const buyItems=parseTodos(card.buys);
+  const updated=buyItems.map(b=>b.text===itemText?{...b,done:true}:b);
+  const newBuys=todosToStrings(updated).join('\n');
+
+  setSyncing(true);
+  await sb.from('cards').update({buys:newBuys}).eq('id',cardId);
+  setSyncing(false);
+
+  // Show toast and refresh after short delay
+  showToast('✓ 已採購：'+itemText);
+  setTimeout(()=>renderTodo(),800);
+}
 
 // ── LOGOS ─────────────────────────────────────────────────────
 async function handleLogoFileSelect(){

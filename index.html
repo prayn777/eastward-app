@@ -320,7 +320,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div id="e-3d-current" style="margin-top:6px"></div>
   </div>
   <div class="form-row"><label>工單（每行一項，儲存後可打勾完成）</label><div id="e-todo-checklist" style="border:1px solid var(--border);border-radius:8px;padding:8px;max-height:220px;overflow-y:auto;background:var(--card)"></div><input type="hidden" id="e-todo"/></div>
-  <div class="form-row"><label>待購買（每行一項）</label><textarea id="e-buy"></textarea></div>
+  <div class="form-row"><label>待購買</label><div id="e-buy-checklist" style="border:1px solid var(--border);border-radius:8px;padding:8px;max-height:200px;overflow-y:auto;background:var(--card)"></div><input type="hidden" id="e-buy"/></div>
   <button class="save-btn" id="edit-save-btn" onclick="saveEdit()">儲存</button>
   <button class="del-btn" onclick="deleteCard()">刪除此專案</button>
 </div>
@@ -455,8 +455,9 @@ async function addCard(){
 }
 
 async function saveEdit(){
-  // sync hidden field from _editTodos before saving
+  // sync hidden fields from checklist state before saving
   syncEditTodoHidden(_editTodos);
+  syncEditBuyHidden(_editBuys);
   const name=document.getElementById('e-name').value.trim();
   if(!name){showToast('請輸入名稱');return;}
   const btn=document.getElementById('edit-save-btn');
@@ -724,7 +725,9 @@ function renderFullCard(c){
   const incompleteOnly=incompleteTodos;
   const incompleteTodHtml=incompleteTodos.length?incompleteTodos.slice(0,5).map(t=>'<div>· '+t.text+'</div>').join('')+(incompleteTodos.length>5?'<div style="color:var(--text3);font-size:10px">還有'+(incompleteTodos.length-5)+'項…</div>':''):'<span style="color:var(--green);font-size:11px">✓ 全部完成</span>';
   const todHtml=todoItems.length?todoItems.map(t=>'<div>· '+t.text+'</div>').join(''):'<span style="color:var(--text3)">無</span>';
-  const buyHtml=c.buys.length?c.buys.map(b=>'<div>· '+b+'</div>').join(''):'<span style="color:var(--text3)">無</span>';
+  const buyItems=parseTodos(c.buys);
+  const undoneBuys=buyItems.filter(b=>!b.done);
+  const buyHtml=undoneBuys.length?undoneBuys.map(b=>'<div>· '+b.text+'</div>').join(''):'<span style="color:var(--green);font-size:11px">✓ 全部完成</span>';
   const quoteUrls=parseQuoteUrls(c.quote_url);
   const hasQuote=quoteUrls.length>0;
   const quoteBtn=hasQuote
@@ -823,12 +826,16 @@ function touchEnd(e,type){
 // ── TODO ─────────────────────────────────────────────────────
 function renderTodo(){
   const con=document.getElementById('page-todo');
-  const w=cards.filter(c=>c.buys.length);
+  // Parse buys and filter only unchecked
+  const w=cards.map(c=>({
+    ...c,
+    undoneBuys:parseTodos(c.buys).filter(b=>!b.done)
+  })).filter(c=>c.undoneBuys.length);
   if(!w.length){con.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">🛒 目前沒有待購買項目</div>';return;}
   let h=`<div class="todo-section"><div class="sec-title">🛒 待購買清單（外出採購用）</div>`;
   w.forEach(c=>{
     h+=`<div class="todo-card"><div class="todo-shop">🏪 ${c.name} <span style="color:var(--text3);font-weight:400">・${c.stage}</span></div>`;
-    c.buys.forEach(b=>h+=`<div class="todo-item"><div class="chk" onclick="toggleChk(this)"></div><span>${b}</span></div>`);
+    c.undoneBuys.forEach(b=>h+=`<div class="todo-item"><div class="chk" onclick="toggleChk(this)"></div><span>${b.text}</span></div>`);
     h+=`</div>`;
   });
   h+=`</div>`;
@@ -953,7 +960,8 @@ function openEdit(id){
   renderEditChecklist(_editTodos);
   document.getElementById('ai-parse-row').style.display='none';
   document.getElementById('e-quote-preview').innerHTML='';
-  document.getElementById('e-buy').value=c.buys.join('\n');
+  _editBuys=c.buys.length?parseTodos(c.buys):[];
+  renderEditBuyChecklist(_editBuys);
   document.getElementById('e-3d-preview').innerHTML='';
   const curQuoteUrls=parseQuoteUrls(c.quote_url);
   const qCurCon=document.getElementById('e-quote-current');
@@ -993,9 +1001,9 @@ function renderEditChecklist(items){
   const con=document.getElementById('e-todo-checklist');
   if(!con)return;
   con.innerHTML=items.map((t,i)=>`
-    <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:0.5px solid var(--border)">
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:0.5px solid var(--border)" title="長按可複製到待購買">
       <div onclick="toggleEditTodo(${i})" style="width:18px;height:18px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;background:${t.done?'var(--blue)':'transparent'};border-color:${t.done?'var(--blue)':'var(--border)'};">${t.done?'<span style=\"color:white\">✓</span>':''}</div>
-      <span style="font-size:13px;color:var(--text);flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span>
+      <span data-idx="${i}" data-text="${t.text.replace(/"/g,'&quot;')}" class="todo-item-text" style="font-size:13px;color:var(--text);flex:1;user-select:none;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span>
       <button onclick="removeEditTodo(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>
     </div>`).join('') +
     `<div style="display:flex;gap:6px;margin-top:6px">
@@ -1003,9 +1011,30 @@ function renderEditChecklist(items){
       <button onclick="addEditTodo()" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px">新增</button>
     </div>`;
   syncEditTodoHidden(items);
+  // Bind long press on each todo item to copy to buy
+  con.querySelectorAll('.todo-item-text').forEach(el=>{
+    let timer=null;
+    el.addEventListener('touchstart',()=>{
+      timer=setTimeout(()=>{
+        const text=el.dataset.text;
+        copyTodoToBuy(text);
+        // Visual feedback
+        el.style.background='var(--blue-light)';
+        setTimeout(()=>el.style.background='',500);
+      },600);
+    },{passive:true});
+    el.addEventListener('touchend',()=>clearTimeout(timer));
+    el.addEventListener('touchmove',()=>clearTimeout(timer),{passive:true});
+    // Desktop: right click
+    el.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      copyTodoToBuy(el.dataset.text);
+    });
+  });
 }
 
 let _editTodos=[];
+let _editBuys=[];
 function toggleEditTodo(i){_editTodos[i].done=!_editTodos[i].done;renderEditChecklist(_editTodos);}
 function removeEditTodo(i){_editTodos.splice(i,1);renderEditChecklist(_editTodos);}
 function addEditTodo(){
@@ -1017,6 +1046,44 @@ function addEditTodo(){
 function syncEditTodoHidden(items){
   const h=document.getElementById('e-todo');
   if(h)h.value=todosToStrings(items).join('\n');
+}
+function syncEditBuyHidden(items){
+  const h=document.getElementById('e-buy');
+  if(h)h.value=todosToStrings(items).join('\n');
+}
+function renderEditBuyChecklist(items){
+  const con=document.getElementById('e-buy-checklist');
+  if(!con)return;
+  con.innerHTML=items.map((t,i)=>`
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:0.5px solid var(--border)">
+      <div onclick="toggleEditBuy(${i})" style="width:18px;height:18px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;background:${t.done?'var(--blue)':'transparent'};border-color:${t.done?'var(--blue)':'var(--border)'};">${t.done?'<span style="color:white">✓</span>':''}</div>
+      <span style="font-size:13px;color:var(--text);flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span>
+      <button onclick="removeEditBuy(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>
+    </div>`).join('') +
+    `<div style="display:flex;gap:6px;margin-top:6px">
+      <input id="new-buy-input" placeholder="新增待購買項目…" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:var(--font);background:var(--card);color:var(--text)" onkeydown="if(event.key==='Enter')addEditBuy()">
+      <button onclick="addEditBuy()" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px">新增</button>
+    </div>`;
+  syncEditBuyHidden(items);
+}
+function toggleEditBuy(i){_editBuys[i].done=!_editBuys[i].done;renderEditBuyChecklist(_editBuys);}
+function removeEditBuy(i){_editBuys.splice(i,1);renderEditBuyChecklist(_editBuys);}
+function addEditBuy(){
+  const inp=document.getElementById('new-buy-input');
+  const txt=inp.value.trim();if(!txt)return;
+  _editBuys.push({text:txt,done:false});
+  inp.value='';renderEditBuyChecklist(_editBuys);
+}
+function copyTodoToBuy(text){
+  // Copy a todo item text to buy list
+  const exists=_editBuys.some(b=>b.text===text);
+  if(!exists){
+    _editBuys.push({text,done:false});
+    renderEditBuyChecklist(_editBuys);
+    showToast('已複製到待購買：'+text);
+  } else {
+    showToast('「'+text+'」已在待購買清單中');
+  }
 }
 
 // ── IMAGE VIEWER with swipe ───────────────────────────────────

@@ -1001,9 +1001,10 @@ function renderEditChecklist(items){
   const con=document.getElementById('e-todo-checklist');
   if(!con)return;
   con.innerHTML=items.map((t,i)=>`
-    <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:0.5px solid var(--border)" title="長按可複製到待購買">
+    <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 2px;border-bottom:0.5px solid var(--border)">
       <div onclick="toggleEditTodo(${i})" style="width:18px;height:18px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;background:${t.done?'var(--blue)':'transparent'};border-color:${t.done?'var(--blue)':'var(--border)'};">${t.done?'<span style=\"color:white\">✓</span>':''}</div>
-      <span data-idx="${i}" data-text="${t.text.replace(/"/g,'&quot;')}" class="todo-item-text" style="font-size:13px;color:var(--text);flex:1;user-select:none;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span>
+      <span data-idx="${i}" data-text="${t.text.replace(/"/g,'&quot;')}" class="todo-item-text" style="font-size:13px;color:var(--text);flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span>
+      <button onclick="copyTodoToBuyByIdx(${i})" style="background:var(--blue-light);border:1px solid #B5D4F4;border-radius:4px;color:var(--blue);cursor:pointer;font-size:10px;padding:2px 5px;line-height:1.4;flex-shrink:0;font-family:var(--font)" title="加入待購買">→買</button>
       <button onclick="removeEditTodo(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>
     </div>`).join('') +
     `<div style="display:flex;gap:6px;margin-top:6px">
@@ -1013,19 +1014,23 @@ function renderEditChecklist(items){
   syncEditTodoHidden(items);
   // Bind long press on each todo item to copy to buy
   con.querySelectorAll('.todo-item-text').forEach(el=>{
-    let timer=null;
-    el.addEventListener('touchstart',()=>{
-      timer=setTimeout(()=>{
-        const text=el.dataset.text;
-        copyTodoToBuy(text);
-        // Visual feedback
-        el.style.background='var(--blue-light)';
-        setTimeout(()=>el.style.background='',500);
-      },600);
+    // Swipe right to copy to buy, or tap the → button
+    let startX=null,startY=null;
+    el.addEventListener('touchstart',e=>{
+      startX=e.touches[0].clientX;
+      startY=e.touches[0].clientY;
     },{passive:true});
-    el.addEventListener('touchend',()=>clearTimeout(timer));
-    el.addEventListener('touchmove',()=>clearTimeout(timer),{passive:true});
-    // Desktop: right click
+    el.addEventListener('touchend',e=>{
+      if(startX===null)return;
+      const dx=e.changedTouches[0].clientX-startX;
+      const dy=Math.abs(e.changedTouches[0].clientY-startY);
+      if(dx>50&&dy<30){
+        copyTodoToBuy(el.dataset.text);
+        el.style.background='var(--blue-light)';
+        setTimeout(()=>el.style.background='',400);
+      }
+      startX=null;
+    },{passive:true});
     el.addEventListener('contextmenu',e=>{
       e.preventDefault();
       copyTodoToBuy(el.dataset.text);
@@ -1075,15 +1080,17 @@ function addEditBuy(){
   inp.value='';renderEditBuyChecklist(_editBuys);
 }
 function copyTodoToBuy(text){
-  // Copy a todo item text to buy list
   const exists=_editBuys.some(b=>b.text===text);
   if(!exists){
     _editBuys.push({text,done:false});
     renderEditBuyChecklist(_editBuys);
-    showToast('已複製到待購買：'+text);
+    showToast('✓ 已加入待購買：'+text);
   } else {
-    showToast('「'+text+'」已在待購買清單中');
+    showToast('已在待購買清單中');
   }
+}
+function copyTodoToBuyByIdx(i){
+  if(_editTodos[i])copyTodoToBuy(_editTodos[i].text);
 }
 
 // ── IMAGE VIEWER with swipe ───────────────────────────────────

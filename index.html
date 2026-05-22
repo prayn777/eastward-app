@@ -220,6 +220,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 
   <div id="page-schedule" class="page active"><div class="spinner"></div></div>
   <div id="page-todo" class="page"></div>
+  <div id="page-logs" class="page"></div>
   <div id="page-company" class="page">
     <div class="co-card">
       <div class="co-title">🌐 官方網站</div>
@@ -242,9 +243,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   </div>
 
   <nav class="nav">
-    <button class="active" onclick="switchPage('schedule',this)"><span style="font-size:20px">📋</span>工作排程</button>
-    <button onclick="switchPage('todo',this)"><span style="font-size:20px">✅</span>待辦採購</button>
-    <button onclick="switchPage('company',this)"><span style="font-size:20px">🏪</span>公司介紹</button>
+    <button class="active" onclick="switchPage('schedule',this)"><span style="font-size:18px">📋</span>工作排程</button>
+    <button onclick="switchPage('todo',this)"><span style="font-size:18px">✅</span>待辦採購</button>
+    <button onclick="switchPage('company',this)"><span style="font-size:18px">🏪</span>公司介紹</button>
+    <button onclick="switchPage('logs',this)"><span style="font-size:18px">📝</span>編輯紀錄</button>
   </nav>
 </div>
 
@@ -449,7 +451,7 @@ async function addCard(){
   await sb.from('cards').insert({name,stage:'接洽中',price:'',deposit:null,todos:'',buys:'',quote_url:null,images3d:JSON.stringify([])});
   btn.textContent='新增專案';btn.disabled=false;
   document.getElementById('f-name').value='';
-  closeModal('modal-add');showToast('已新增「'+name+'」');
+  closeModal('modal-add');showToast('已新增「'+name+'」');writeLog('新增專案',name,'新增專案到「接洽中」');
 }
 
 async function saveEdit(){
@@ -472,18 +474,22 @@ async function saveEdit(){
   await sb.from('cards').update(upd).eq('id',editingId);
   btn.textContent='儲存';btn.disabled=false;
   editPendingQuote=null;editPending3D=[];
-  closeModal('modal-edit');showToast('已儲存');
+  const savedCard=cards.find(c=>c.id===editingId);writeLog('儲存編輯',savedCard?.name||name,'更新專案資料');closeModal('modal-edit');showToast('已儲存');
 }
 
 async function deleteCard(){
   if(!confirm('確定刪除？'))return;
+  const delCard=cards.find(c=>c.id===editingId);
   await sb.from('cards').delete().eq('id',editingId);
+  writeLog('刪除專案',delCard?.name||'','專案已刪除');
   closeModal('modal-edit');showToast('已刪除');
 }
 
 async function moveCard(id,stage){
   setSyncing(true);
+  const c=cards.find(x=>x.id===id);
   await sb.from('cards').update({stage}).eq('id',id);
+  writeLog('移動階段',c?.name||'','移動到「'+stage+'」');
   showToast('→ '+stage);
 }
 
@@ -1073,6 +1079,7 @@ function switchPage(name,btn){
   btn.classList.add('active');
   if(name==='todo')renderTodo();
   if(name==='company')loadLogos();
+  if(name==='logs')renderLogs();
 }
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2200);}
 function shareCard(type){
@@ -1125,6 +1132,70 @@ function openQuoteViewer(cardId){
   if(!c)return;
   const urls=parseQuoteUrls(c.quote_url);
   if(urls.length)viewImageArr(urls,0);
+}
+
+// ── LOGS ─────────────────────────────────────────────────────
+async function writeLog(action, cardName, detail){
+  if(!currentUser)return;
+  const userName=currentUser.user_metadata?.full_name||currentUser.email||'未知';
+  const userEmail=currentUser.email||'';
+  try{
+    await sb.from('logs').insert({
+      user_name:userName,
+      user_email:userEmail,
+      action,
+      card_name:cardName||'',
+      detail:detail||''
+    });
+  }catch(e){console.warn('writeLog error:',e);}
+}
+
+async function renderLogs(){
+  const con=document.getElementById('page-logs');
+  if(!con)return;
+  con.innerHTML='<div class="loading"><div class="spinner"></div>載入中…</div>';
+  const{data,error}=await sb.from('logs').select('*').order('created_at',{ascending:false}).limit(100);
+  if(error||!data){con.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">載入失敗</div>';return;}
+  if(!data.length){con.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">📝 目前沒有編輯紀錄</div>';return;}
+
+  // Group by date
+  const groups={};
+  data.forEach(log=>{
+    const d=new Date(log.created_at);
+    const dateKey=d.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+    if(!groups[dateKey])groups[dateKey]=[];
+    groups[dateKey].push(log);
+  });
+
+  let h='';
+  Object.entries(groups).forEach(([date,logs])=>{
+    h+=`<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:0.5px;padding:6px 0 8px">${date}</div>`;
+    logs.forEach(log=>{
+      const time=new Date(log.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+      const avatar=(log.user_name||'?').charAt(0).toUpperCase();
+      const actionColor=
+        log.action==='新增專案'?'#1D9E75':
+        log.action==='刪除專案'?'#E24B4A':
+        log.action==='移動階段'?'#185FA5':
+        log.action==='完成工單'?'#639922':
+        log.action==='儲存編輯'?'#378ADD':'#888780';
+      h+=`<div style="background:var(--card);border-radius:10px;border:1px solid var(--border);padding:11px 13px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start">
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--blue-dark);flex-shrink:0">${avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+            <span style="font-size:12px;font-weight:700;color:var(--text)">${log.user_name||log.user_email||'未知'}</span>
+            <span style="font-size:10px;padding:1px 7px;border-radius:4px;font-weight:500;background:${actionColor}20;color:${actionColor}">${log.action}</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:auto">${time}</span>
+          </div>
+          ${log.card_name?`<div style="font-size:11px;color:var(--text2);margin-bottom:2px">📌 ${log.card_name}</div>`:''}
+          ${log.detail?`<div style="font-size:11px;color:var(--text)">${log.detail}</div>`:''}
+        </div>
+      </div>`;
+    });
+    h+=`</div>`;
+  });
+  con.innerHTML=h;
 }
 
 initAuth();

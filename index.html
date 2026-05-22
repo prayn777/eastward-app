@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>向東車庫 Eastward</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="向東車庫">
+<meta name="application-name" content="向東車庫">
+<meta name="theme-color" content="#1B3F5E">
+<link rel="apple-touch-icon" href="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/eastwardlogo.jpg">
+<link rel="icon" type="image/jpeg" href="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/eastwardlogo.jpg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#185FA5;--blue-light:#E6F1FB;--blue-dark:#0C447C;
+  --green:#3B6D11;--green-light:#EAF3DE;
+  --amber:#854F0B;--amber-light:#FAEEDA;
+  --red:#A32D2D;--red-light:#FCEBEB;
+  --bg:#F5F4F0;--card:#FFF;--border:#E2E0DA;
+  --text:#1A1A18;--text2:#5F5E5A;--text3:#B4B2A9;
+  --font:'Noto Sans TC',sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* AUTH */
+#auth-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:var(--bg)}
+#loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+  .auth-logo{width:150px;height:150px;border-radius:20px;overflow:hidden;margin-bottom:20px}
+.auth-logo img{width:100%;height:100%;object-fit:cover}
+.auth-title{font-size:22px;font-weight:700;margin-bottom:4px;text-align:center}
+.auth-sub{font-size:11px;color:var(--text2);letter-spacing:1.5px;margin-bottom:36px;text-align:center}
+.google-btn{display:flex;align-items:center;gap:12px;padding:14px 24px;background:white;border:1px solid var(--border);border-radius:12px;font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font);width:100%;max-width:300px;justify-content:center}
+.auth-note{font-size:11px;color:var(--text3);margin-top:12px;text-align:center}
+.auth-hint{font-size:11px;color:var(--amber);margin-top:8px;text-align:center;background:var(--amber-light);padding:8px 14px;border-radius:8px;max-width:300px}
+
+/* APP */
+#app-screen{display:none;max-width:430px;margin:0 auto;background:var(--bg);min-height:100vh;padding-bottom:70px}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:10px 14px 8px;position:sticky;top:0;z-index:100}
+.topbar-row{display:flex;align-items:center;gap:10px}
+.topbar-logo{width:34px;height:34px;border-radius:7px;overflow:hidden;flex-shrink:0}
+.topbar-logo img{width:100%;height:100%;object-fit:cover}
+.topbar-text{flex:1}
+.topbar h1{font-size:14px;font-weight:700;color:var(--text)}
+.topbar h1 span{font-size:10px;color:var(--blue);font-weight:400;letter-spacing:1.2px;margin-left:4px}
+.topbar p{font-size:9px;color:var(--text3);letter-spacing:1px}
+.sync-dot{width:5px;height:5px;border-radius:50%;background:#1D9E75;display:inline-block;margin-left:4px;vertical-align:middle}
+.sync-dot.syncing{background:#EF9F27;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.user-av{width:28px;height:28px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue-dark);cursor:pointer;overflow:hidden;flex-shrink:0}
+.user-av img{width:100%;height:100%;object-fit:cover}
+
+.nav{display:flex;background:var(--card);border-top:1px solid var(--border);position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:100}
+.nav button{flex:1;padding:9px 4px 7px;font-size:10px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:var(--font);display:flex;flex-direction:column;align-items:center;gap:3px;border-top:2px solid transparent;transition:all 0.15s}
+.nav button.active{color:var(--blue);border-top-color:var(--blue)}
+
+.page{display:none;padding:10px}
+.page.active{display:block}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;margin:20px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── PHASE ACCORDION ── */
+.phase-block{margin-bottom:8px;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.phase-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--card);cursor:pointer;user-select:none}
+.phase-header-left{display:flex;align-items:center;gap:8px}
+.phase-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-1{background:#378ADD}.dot-2{background:#639922}.dot-3{background:#1D9E75}
+.phase-title{font-size:13px;font-weight:700;color:var(--text)}
+.phase-count{font-size:11px;color:var(--text3);background:var(--bg);padding:2px 7px;border-radius:10px}
+.phase-chevron{font-size:14px;color:var(--text3);transition:transform 0.2s;line-height:1}
+.phase-header.open .phase-chevron{transform:rotate(180deg)}
+.phase-body{display:none;background:var(--bg);padding:10px}
+.phase-body.open{display:block}
+
+/* ── KANBAN (phase 1 & 3) ── */
+.kanban-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.kanban-scroll::-webkit-scrollbar{display:none}
+.kanban-col{flex:0 0 130px;min-width:130px}
+.kanban-col-title{font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:4px;letter-spacing:0.3px}
+.col-count{font-size:10px;background:var(--card);border:1px solid var(--border);color:var(--text3);padding:1px 5px;border-radius:8px}
+.kanban-drop{min-height:40px;border-radius:8px;transition:all 0.2s;display:flex;flex-direction:column;gap:6px}
+.kanban-drop.drag-over{background:#EBF4FF;border:1.5px dashed var(--blue);min-height:60px}
+
+/* MINI CARD (phase 1 & 3) */
+.mini-card{background:var(--card);border-radius:9px;border:1px solid var(--border);padding:10px 11px;cursor:grab;user-select:none;transition:opacity 0.15s}
+.mini-card.dragging{opacity:0.3}
+.mini-card.warn30{border-left:3px solid #EF9F27;border-radius:0 9px 9px 0}
+.mini-card.warn40{border-left:3px solid #E24B4A;border-radius:0 9px 9px 0}
+.mini-card-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px}
+.mini-card-badge{font-size:10px;padding:1px 5px;border-radius:3px;display:inline-block}
+.mini-card-edit{font-size:10px;color:var(--text3);margin-top:5px;text-align:right;cursor:pointer}
+.mini-card-hint{font-size:9px;color:var(--text3);margin-top:3px;text-align:right}
+
+/* FULL CARD (phase 2) */
+.stage-group2{margin-bottom:12px}
+.stage-label2{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.stage-cnt{background:var(--card);border:1px solid var(--border);color:var(--text3);font-size:10px;padding:1px 5px;border-radius:8px;margin-left:3px}
+.full-drop{min-height:8px;border-radius:10px;transition:all 0.2s}
+.full-drop.drag-over{min-height:52px;background:#EBF4FF;border:1.5px dashed var(--blue)}
+
+.card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:13px;margin-bottom:8px;cursor:grab;user-select:none}
+.card.dragging{opacity:0.3}
+.card.warn30{border-left:4px solid #EF9F27;border-radius:0 12px 12px 0}
+.card.warn40{border-left:4px solid #E24B4A;border-radius:0 12px 12px 0}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:7px}
+.card-name{font-size:14px;font-weight:700;color:var(--text)}
+.card-right{display:flex;align-items:center;gap:5px}
+.card-price{font-size:11px;color:var(--blue);font-weight:500}
+.edit-btn{width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-size:13px;color:var(--text2)}
+.card-files{display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap}
+.file-btn{font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:none;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:3px;font-family:var(--font);text-decoration:none}
+.file-btn.has-file{border-color:#B5D4F4;color:var(--blue);background:var(--blue-light)}
+.file-btn.upload{border-style:dashed}
+.badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500}
+.b-ok{background:var(--green-light);color:var(--green)}
+.b-warn{background:var(--amber-light);color:var(--amber)}
+.b-urgent{background:var(--red-light);color:var(--red)}
+.b-none{background:#F1EFE8;color:var(--text3)}
+.card-lists{display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border);padding-top:8px}
+.mini-list h4{font-size:10px;color:var(--text2);margin-bottom:3px}
+.mini-list div{font-size:11px;color:var(--text);line-height:1.55}
+.img-grid{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.img-thumb{width:48px;height:48px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer}
+.drag-hint{font-size:9px;color:var(--text3);text-align:right;margin-top:5px}
+
+.add-btn{width:100%;padding:11px;border:1.5px dashed var(--border);border-radius:12px;background:none;color:var(--text2);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font);margin-top:6px}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:20px 16px 36px;max-height:92vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.modal-x{background:none;border:none;font-size:24px;cursor:pointer;color:var(--text2);line-height:1;padding:0;font-family:var(--font)}
+.form-row{margin-bottom:12px}
+.form-row label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.form-row input,.form-row textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);font-family:var(--font);outline:none}
+.form-row input:focus,.form-row textarea:focus{border-color:var(--blue)}
+.form-row textarea{height:68px;resize:none}
+.form-row input[type=file]{padding:6px;font-size:12px}
+.upload-progress{font-size:11px;color:var(--blue);margin-top:4px;display:none}
+.uploaded-files{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.uploaded-tag{font-size:10px;padding:3px 8px;background:var(--blue-light);color:var(--blue);border-radius:4px;display:flex;align-items:center;gap:4px}
+.save-btn{width:100%;padding:13px;background:var(--blue);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);margin-top:4px}
+.del-btn{width:100%;padding:11px;background:none;border:1px solid #F09595;color:var(--red);border-radius:10px;font-size:13px;cursor:pointer;font-family:var(--font);margin-top:8px}
+
+/* IMAGE VIEWER */
+.viewer-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:500;align-items:center;justify-content:center}
+.viewer-bg.open{display:flex}
+.viewer-bg img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px}
+.viewer-close{position:absolute;top:16px;right:16px;color:white;font-size:30px;cursor:pointer;background:none;border:none}
+
+/* TODO */
+.todo-section{margin-bottom:18px}
+.sec-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:9px}
+.todo-card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:11px;margin-bottom:7px}
+.todo-shop{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.todo-item{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:12px}
+.chk{width:16px;height:16px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.chk.done{background:var(--blue);border-color:var(--blue);color:white;font-size:11px}
+.done-txt{text-decoration:line-through;color:var(--text3)}
+
+/* COMPANY */
+.co-card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:15px;margin-bottom:10px}
+.co-title{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.co-btns{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.co-btn{padding:11px 6px;border:1px solid var(--border);border-radius:9px;background:none;font-size:11px;color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:var(--font)}
+.co-btn.wide{grid-column:span 2;flex-direction:row;justify-content:center;font-size:12px;gap:8px}
+.namecard-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block;cursor:pointer;margin-bottom:12px}
+.logo-list{display:flex;flex-direction:column;gap:8px}
+.logo-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px}
+.logo-thumb{width:52px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;overflow:hidden}
+.logo-thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.logo-info{flex:1;min-width:0}
+.logo-name{font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logo-url{font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-btn{width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
+
+.toast-wrap{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);z-index:300;pointer-events:none;width:calc(100% - 32px);max-width:398px;display:flex;justify-content:center}
+.toast{background:#2C2C2A;color:white;padding:10px 20px;border-radius:10px;font-size:13px;display:none;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div style="width:70px;height:70px;border-radius:14px;overflow:hidden;margin-bottom:16px"><img src="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/eastwardlogo.jpg" style="width:100%;height:100%;object-fit:cover"></div>
+  <div style="font-size:14px;font-weight:700;color:var(--text)">向東車庫</div>
+  <div style="width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;margin-top:20px"></div>
+</div>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-logo"><img src="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/eastwardlogo.jpg" alt="logo"></div>
+  <div class="auth-title">向東車庫</div>
+  <div class="auth-sub">EASTWARD · CUSTOM FOODTRUCK</div>
+  <button class="google-btn" onclick="signInWithGoogle()">
+    <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    使用 Google 帳號登入
+  </button>
+  <div class="auth-note">限公司成員使用</div>
+  <div class="auth-hint">⚠️ 手機請用 Safari 或 Chrome，不可在 LINE 內登入</div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-row">
+      <div class="topbar-logo"><img src="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/eastwardlogo.jpg" alt="logo"></div>
+      <div class="topbar-text">
+        <h1>向東車庫 <span>EASTWARD</span><span class="sync-dot" id="sync-dot"></span></h1>
+        <p>FOOD TRUCK · INTERIOR DESIGN</p>
+      </div>
+      <div class="user-av" id="user-av" onclick="signOut()">?</div>
+    </div>
+  </div>
+
+  <div id="page-schedule" class="page active"><div class="spinner"></div></div>
+  <div id="page-todo" class="page"></div>
+  <div id="page-company" class="page">
+    <div class="co-card">
+      <div class="co-title">🌐 官方網站</div>
+      <button class="co-btn wide" onclick="window.open('https://goeast.tw/','_blank')">🔗 goeast.tw</button>
+    </div>
+    <div class="co-card">
+      <div class="co-title">🪪 陳冠宇 電子名片</div>
+      <img src="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/KuanYunamecard.png" class="namecard-img" onclick="viewImage(this.src)" alt="名片">
+      <div class="co-btns">
+        <button class="co-btn" onclick="shareCard('line')"><span style="font-size:20px">💬</span>分享到 LINE</button>
+        <button class="co-btn" onclick="shareCard('download')"><span style="font-size:20px">⬇️</span>下載圖片</button>
+      </div>
+    </div>
+    <div class="co-card">
+      <div class="co-title"><span>🖼 LOGO 管理</span>
+        <button style="font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:var(--font)" onclick="openLogoAdd()">＋ 新增</button>
+      </div>
+      <div class="logo-list" id="logo-list"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="active" onclick="switchPage('schedule',this)"><span style="font-size:20px">📋</span>工作排程</button>
+    <button onclick="switchPage('todo',this)"><span style="font-size:20px">✅</span>待辦採購</button>
+    <button onclick="switchPage('company',this)"><span style="font-size:20px">🏪</span>公司介紹</button>
+  </nav>
+</div>
+
+<!-- VIEWER -->
+<div class="viewer-bg" id="viewer" onclick="handleViewerBgClick(event)">
+  <button class="viewer-close" onclick="closeViewer()">×</button>
+  <button id="viewer-prev" onclick="event.stopPropagation();viewerNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;color:white;font-size:32px;cursor:pointer;padding:8px 14px;border-radius:8px;z-index:10">‹</button>
+  <img id="viewer-img" src="" alt="" onclick="event.stopPropagation()" style="max-width:88vw;max-height:86vh;object-fit:contain;border-radius:8px">
+  <button id="viewer-next" onclick="event.stopPropagation();viewerNav(1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;color:white;font-size:32px;cursor:pointer;padding:8px 14px;border-radius:8px;z-index:10">›</button>
+  <div id="viewer-counter" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:white;font-size:12px;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:10px"></div>
+</div>
+
+<!-- MODAL ADD -->
+<div class="modal-bg" id="modal-add" onclick="handleModalBgClick(event,'modal-add')">
+<div class="modal" onclick="event.stopPropagation()">
+  <h3>新增業主專案 <button class="modal-x" onclick="closeModal('modal-add')">×</button></h3>
+  <div class="form-row"><label>店名／業主名稱 *</label><input id="f-name" placeholder="例：好日子咖啡"/></div>
+  <div style="font-size:11px;color:var(--text3);margin-bottom:12px;padding:8px 10px;background:#F8F7F4;border-radius:6px">📌 其餘資料（報價、訂金、待辦等）進入第二階段後再填入</div>
+  <button class="save-btn" id="add-save-btn" onclick="addCard()">新增專案</button>
+</div>
+</div>
+
+<!-- MODAL EDIT -->
+<div class="modal-bg" id="modal-edit" onclick="handleModalBgClick(event,'modal-edit')">
+<div class="modal" onclick="event.stopPropagation()">
+  <h3 id="edit-title">編輯專案 <button class="modal-x" onclick="closeModal('modal-edit')">×</button></h3>
+  <div class="form-row"><label>店名／業主名稱</label><input id="e-name"/></div>
+  <div class="form-row">
+    <label>目前階段</label>
+    <select id="e-stage" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);font-family:var(--font);outline:none">
+      <optgroup label="第一階段">
+        <option value="接洽中">接洽中</option>
+        <option value="待討論">待討論</option>
+        <option value="待繪圖">待繪圖</option>
+        <option value="待報價">待報價</option>
+        <option value="等現場">等現場</option>
+      </optgroup>
+      <optgroup label="第二階段">
+        <option value="木工階段">木工階段</option>
+        <option value="白鐵階段">白鐵階段</option>
+        <option value="電路">電路</option>
+        <option value="裝飾貼圖">裝飾貼圖</option>
+      </optgroup>
+      <optgroup label="第三階段">
+        <option value="待清潔">待清潔</option>
+        <option value="待交車">待交車</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="form-row"><label>總報價（NT$）</label><input id="e-price"/></div>
+  <div class="form-row"><label>付訂金日期</label><input type="date" id="e-deposit"/></div>
+  <div class="form-row">
+    <label>報價單圖片（可上傳多張，例如截圖兩頁）</label>
+    <input type="file" id="e-quote" accept="image/*" multiple onchange="handleQuoteSelect()"/>
+    <div class="upload-progress" id="e-quote-prog">上傳中…</div>
+    <div id="e-quote-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
+    <div id="e-quote-current" style="margin-top:4px"></div>
+    <div id="ai-parse-row" style="display:none;margin-top:8px">
+      <button onclick="parseQuoteWithAI()" id="ai-parse-btn"
+        style="width:100%;padding:10px;background:#F0F7FF;border:1px solid #B5D4F4;border-radius:8px;color:var(--blue);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px">
+        ✨ AI 自動讀取報價單，填入待辦事項
+      </button>
+      <div id="ai-parse-status" style="font-size:11px;color:var(--text3);margin-top:5px;text-align:center"></div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>3D 圖片（可多張）</label>
+    <input type="file" id="e-3d" accept="image/*" multiple onchange="handle3DSelect()"/>
+    <div class="upload-progress" id="e-3d-prog">上傳中…</div>
+    <div class="uploaded-files" id="e-3d-preview"></div>
+    <div id="e-3d-current" style="margin-top:6px"></div>
+  </div>
+  <div class="form-row"><label>工單（每行一項，儲存後可打勾完成）</label><div id="e-todo-checklist" style="border:1px solid var(--border);border-radius:8px;padding:8px;max-height:220px;overflow-y:auto;background:var(--card)"></div><input type="hidden" id="e-todo"/></div>
+  <div class="form-row"><label>待購買（每行一項）</label><textarea id="e-buy"></textarea></div>
+  <button class="save-btn" id="edit-save-btn" onclick="saveEdit()">儲存</button>
+  <button class="del-btn" onclick="deleteCard()">刪除此專案</button>
+</div>
+</div>
+
+<!-- MODAL LOGO -->
+<div class="modal-bg" id="modal-logo" onclick="handleModalBgClick(event,'modal-logo')">
+<div class="modal" onclick="event.stopPropagation()">
+  <h3 id="logo-modal-title">新增 LOGO <button class="modal-x" onclick="closeModal('modal-logo')">×</button></h3>
+  <div class="form-row"><label>版本名稱</label><input id="l-name" placeholder="深色版、去背PNG…"/></div>
+  <div class="form-row">
+    <label>圖片</label>
+    <input type="file" id="l-file" accept="image/*" onchange="handleLogoFileSelect()"/>
+    <div class="upload-progress" id="l-file-prog" style="display:none">上傳中…</div>
+    <div id="l-preview" style="margin-top:6px"></div>
+    <input type="hidden" id="l-url"/>
+  </div>
+  <button class="save-btn" id="logo-save-btn" onclick="saveLogo()">儲存</button>
+  <button class="del-btn" id="logo-del-btn" style="display:none" onclick="deleteLogo()">刪除</button>
+</div>
+</div>
+
+<div class="toast-wrap"><div class="toast" id="toast"></div></div>
+
+<script>
+const SURL='https://qiujqhyxmchyqwlrnqpz.supabase.co';
+const SKEY='sb_publishable_M45mbS3tEP7UQfbtaX2P4Q_02RcilBw';
+const sb=supabase.createClient(SURL,SKEY);
+
+const P1_STAGES=['接洽中','待討論','待繪圖','待報價','等現場'];
+const P2_STAGES=['木工階段','白鐵階段','電路','裝飾貼圖'];
+const P3_STAGES=['待清潔','待交車'];
+// open state: default p2 open, p1&p3 open too
+const phaseOpen={p1:true,p2:true,p3:true};
+
+let cards=[],logos=[],editingId=null,editingLogoId=null,currentUser=null;
+let editPendingQuote=null,editPending3D=[];
+
+// ── AUTH ─────────────────────────────────────────────────────
+async function signInWithGoogle(){
+  const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
+  if(error)showToast('登入失敗');
+}
+async function signOut(){
+  if(!confirm('確定登出？'))return;
+  await sb.auth.signOut();
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+async function initAuth(){
+  // Handle OAuth redirect with token in hash
+  if(window.location.hash&&window.location.hash.includes('access_token')){
+    await new Promise(r=>setTimeout(r,600));
+    const{data}=await sb.auth.getSession();
+    if(data?.session){currentUser=data.session.user;window.history.replaceState(null,'',window.location.pathname);showApp();return;}
+  }
+  // Check existing session
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){currentUser=session.user;showApp();return;}
+  // No session - show login
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  // Listen for future auth changes
+  sb.auth.onAuthStateChange((ev,s)=>{
+    if(s&&ev==='SIGNED_IN'){currentUser=s.user;showApp();}
+    if(ev==='SIGNED_OUT'){
+      document.getElementById('app-screen').style.display='none';
+      document.getElementById('loading-screen').style.display='none';
+      document.getElementById('auth-screen').style.display='flex';
+    }
+  });
+}
+function showApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  const av=document.getElementById('user-av');
+  if(currentUser?.user_metadata?.avatar_url)av.innerHTML=`<img src="${currentUser.user_metadata.avatar_url}">`;
+  else av.textContent=(currentUser?.user_metadata?.full_name||currentUser?.email||'?').charAt(0).toUpperCase();
+  loadCards();loadLogos();subscribeRealtime();
+}
+
+// ── REALTIME ─────────────────────────────────────────────────
+function subscribeRealtime(){
+  sb.channel('c').on('postgres_changes',{event:'*',schema:'public',table:'cards'},()=>loadCards()).subscribe();
+  // Logos realtime removed - managed locally to avoid overwriting renders
+}
+function setSyncing(v){document.getElementById('sync-dot').classList.toggle('syncing',v);}
+
+// ── DATA ─────────────────────────────────────────────────────
+async function loadCards(){
+  setSyncing(true);
+  const{data,error}=await sb.from('cards').select('*').order('created_at');
+  if(!error){
+    cards=data.map(c=>({...c,
+      todos:c.todos?c.todos.split('\n').filter(Boolean):[],
+      buys:c.buys?c.buys.split('\n').filter(Boolean):[],
+      images3d:c.images3d&&c.images3d!=='[]'&&c.images3d!=='null'?tryParseJSON(c.images3d):[]
+    }));
+    renderSchedule();
+    if(document.getElementById('page-todo').classList.contains('active'))renderTodo();
+  }
+  setSyncing(false);
+}
+function tryParseJSON(s){try{return JSON.parse(s);}catch{return [];}}
+
+async function loadLogos(){
+  try{
+    const{data,error}=await sb.from('logos').select('*').order('created_at');
+    if(error)throw error;
+    logos=data||[];
+    // Only render if element exists (company page is visible)
+    const con=document.getElementById('logo-list');
+    if(con)renderLogos();
+  }catch(err){
+    logos=[];
+    const con=document.getElementById('logo-list');
+    if(con)renderLogos();
+    console.warn('loadLogos error:',err);
+  }
+}
+
+async function addCard(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){showToast('請輸入名稱');return;}
+  const btn=document.getElementById('add-save-btn');
+  btn.textContent='新增中…';btn.disabled=true;
+  await sb.from('cards').insert({name,stage:'接洽中',price:'',deposit:null,todos:'',buys:'',quote_url:null,images3d:JSON.stringify([])});
+  btn.textContent='新增專案';btn.disabled=false;
+  document.getElementById('f-name').value='';
+  closeModal('modal-add');showToast('已新增「'+name+'」');
+}
+
+async function saveEdit(){
+  // sync hidden field from _editTodos before saving
+  syncEditTodoHidden(_editTodos);
+  const name=document.getElementById('e-name').value.trim();
+  if(!name){showToast('請輸入名稱');return;}
+  const btn=document.getElementById('edit-save-btn');
+  btn.textContent='儲存中…';btn.disabled=true;
+  const orig=cards.find(c=>c.id===editingId);
+  const allImgs=[...(orig?.images3d||[]),...editPending3D];
+  const upd={name,
+    stage:document.getElementById('e-stage').value,
+    price:document.getElementById('e-price').value.trim(),
+    deposit:document.getElementById('e-deposit').value||null,
+    todos:document.getElementById('e-todo').value.trim(),
+    buys:document.getElementById('e-buy').value.trim(),
+    images3d:JSON.stringify(allImgs)};
+  if(editPendingQuote!=null)upd.quote_url=editPendingQuote;
+  await sb.from('cards').update(upd).eq('id',editingId);
+  btn.textContent='儲存';btn.disabled=false;
+  editPendingQuote=null;editPending3D=[];
+  closeModal('modal-edit');showToast('已儲存');
+}
+
+async function deleteCard(){
+  if(!confirm('確定刪除？'))return;
+  await sb.from('cards').delete().eq('id',editingId);
+  closeModal('modal-edit');showToast('已刪除');
+}
+
+async function moveCard(id,stage){
+  setSyncing(true);
+  await sb.from('cards').update({stage}).eq('id',id);
+  showToast('→ '+stage);
+}
+
+// ── FILE UPLOAD ───────────────────────────────────────────────
+async function uploadFile(file,folder){
+  const ext=file.name.split('.').pop();
+  const filename=`${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const bucket=folder==='assets'?'assets':'projects';
+  const{error}=await sb.storage.from(bucket).upload(filename,file,{upsert:true});
+  if(error){console.error('upload error:',error);showToast('上傳失敗：'+error.message);return null;}
+  return sb.storage.from(bucket).getPublicUrl(filename).data.publicUrl;
+}
+async function handleQuoteSelect(){
+  const files=Array.from(document.getElementById('e-quote').files);
+  if(!files.length)return;
+  document.getElementById('e-quote-prog').style.display='block';
+  window._pendingQuoteFiles=files;
+  const urls=[];
+  for(const f of files){
+    const url=await uploadFile(f,'quotes');
+    if(url)urls.push(url);
+  }
+  document.getElementById('e-quote-prog').style.display='none';
+  if(urls.length){
+    // Store ALL urls as JSON string
+    editPendingQuote=JSON.stringify(urls);
+    window._pendingQuoteUrls=urls;
+    // show previews - use data-idx to avoid JSON in onclick
+    const prev=document.getElementById('e-quote-preview');
+    prev.innerHTML=urls.map((u,i)=>`<img src="${u}" data-idx="${i}" data-type="newquote" style="height:60px;border-radius:6px;border:1px solid var(--border);cursor:pointer">`).join('');
+    prev.querySelectorAll('img').forEach(img=>img.addEventListener('click',()=>{
+      openViewerFromNewQuote(parseInt(img.dataset.idx));
+    }));
+    document.getElementById('ai-parse-row').style.display='block';
+    showToast('報價單上傳完成（'+urls.length+'張），可用 AI 自動填入待辦');
+  }
+}
+function openViewerFromNewQuote(idx){
+  viewImageArr(window._pendingQuoteUrls||[],idx);
+}
+
+function getAnthropicKey(){
+  return localStorage.getItem('eastward_ai_key')||'';
+}
+function setAnthropicKey(key){
+  localStorage.setItem('eastward_ai_key',key);
+}
+
+async function parseQuoteWithAI(){
+  // Check for API key
+  let key=getAnthropicKey();
+  if(!key){
+    key=prompt('請輸入 Anthropic API Key（只需輸入一次，會記住在此裝置）：');
+    if(!key)return;
+    setAnthropicKey(key.trim());
+  }
+  const files=window._pendingQuoteFiles;
+  if(!files||!files.length){showToast('請先上傳報價單圖片');return;}
+  const btn=document.getElementById('ai-parse-btn');
+  const status=document.getElementById('ai-parse-status');
+  btn.textContent='⏳ AI 讀取中，請稍候…';btn.disabled=true;
+  status.textContent='正在分析報價單內容…';
+  try{
+    // Convert all images to base64
+    const imgBlocks=await Promise.all(files.map(f=>new Promise((res,rej)=>{
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const b64=reader.result.split(',')[1];
+        const mt=f.type||'image/jpeg';
+        res({type:'image',source:{type:'base64',media_type:mt,data:b64}});
+      };
+      reader.onerror=rej;
+      reader.readAsDataURL(f);
+    })));
+
+    const response=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key||getAnthropicKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-opus-4-5',
+        max_tokens:1000,
+        messages:[{
+          role:'user',
+          content:[
+            ...imgBlocks,
+            {type:'text',text:`請讀取這份改裝報價單圖片，把所有有項目編號（數字）的「描述」欄位內容條列出來。
+只要描述文字，不要編號、數量、單價、金額。
+每行一項，直接輸出文字清單，不要任何說明或前言。
+例如：
+瓦斯槽
+水桶槽
+工作區吊櫃`}
+          ]
+        }]
+      })
+    });
+
+    const data=await response.json();
+    if(data.error){throw new Error(data.error.message);}
+    const text=data.content?.find(b=>b.type==='text')?.text||'';
+    const items=text.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(items.length>0){
+      const existing=document.getElementById('e-todo').value.trim();
+      const existingItems=existing?existing.split('\n').map(s=>s.trim()).filter(Boolean):[];
+      const newItems=items.map(t=>({text:t,done:false}));
+      _editTodos=[..._editTodos,...newItems];
+      renderEditChecklist(_editTodos);
+      btn.textContent='✅ 已填入 '+items.length+' 項';
+      status.textContent='讀取到 '+items.length+' 個項目，已加入工單';
+      showToast('✨ AI 自動填入 '+items.length+' 項工單！');
+    }else{
+      throw new Error('未讀取到項目');
+    }
+  }catch(err){
+    btn.textContent='✨ AI 自動讀取報價單，填入待辦事項';
+    btn.disabled=false;
+    status.textContent='讀取失敗：'+err.message;
+    showToast('AI 讀取失敗');
+  }
+}
+async function handle3DSelect(){
+  const files=Array.from(document.getElementById('e-3d').files);if(!files.length)return;
+  document.getElementById('e-3d-prog').style.display='block';
+  for(const f of files){const u=await uploadFile(f,'3d-images');if(u)editPending3D.push(u);}
+  document.getElementById('e-3d-prog').style.display='none';
+  renderEditPending3D();showToast('上傳完成 '+files.length+' 張');
+}
+function renderEditPending3D(){
+  document.getElementById('e-3d-preview').innerHTML=editPending3D.map((u,i)=>`
+    <div class="uploaded-tag"><img src="${u}" style="width:18px;height:18px;object-fit:cover;border-radius:3px" onclick="viewImage('${u}')"> 圖${i+1}
+    <button style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:12px" onclick="editPending3D.splice(${i},1);renderEditPending3D()">×</button></div>`).join('');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+function daysSince(d){if(!d)return null;return Math.floor((new Date()-new Date(d))/86400000);}
+function urgBadge(d){
+  if(d===null)return'<span class="badge b-none">未設定</span>';
+  if(d>=40)return`<span class="badge b-urgent">🔥${d}天</span>`;
+  if(d>=30)return`<span class="badge b-warn">⏰${d}天</span>`;
+  return`<span class="badge b-ok">✓${d}天</span>`;
+}
+function miniCardCls(d){if(!d&&d!==0)return'';if(d>=40)return' warn40';if(d>=30)return' warn30';return'';}
+
+// ── RENDER SCHEDULE ──────────────────────────────────────────
+function renderSchedule(){
+  const con=document.getElementById('page-schedule');
+  const p1c=cards.filter(c=>P1_STAGES.includes(c.stage)).length;
+  const p2c=cards.filter(c=>P2_STAGES.includes(c.stage)).length;
+  const p3c=cards.filter(c=>P3_STAGES.includes(c.stage)).length;
+
+  con.innerHTML=`
+    ${renderPhaseBlock('p1','dot-1','第一階段',p1c,renderKanban(P1_STAGES,'p1'))}
+    ${renderPhaseBlock('p2','dot-2','第二階段',p2c,renderFullStages(P2_STAGES))}
+    ${renderPhaseBlock('p3','dot-3','第三階段',p3c,renderKanban(P3_STAGES,'p3'))}
+    <button class="add-btn" onclick="openModal('modal-add')">＋ 新增業主專案</button>
+  `;
+  // bind drag for full cards
+  bindImgsAndDrag();
+}
+
+function renderPhaseBlock(id,dot,label,count,bodyHtml){
+  const open=phaseOpen[id];
+  return`<div class="phase-block">
+    <div class="phase-header${open?' open':''}" onclick="togglePhase('${id}')">
+      <div class="phase-header-left">
+        <span class="phase-dot ${dot}"></span>
+        <span class="phase-title">${label}</span>
+        <span class="phase-count">${count} 個專案</span>
+      </div>
+      <span class="phase-chevron">▾</span>
+    </div>
+    <div class="phase-body${open?' open':''}" id="body-${id}">${bodyHtml}</div>
+  </div>`;
+}
+
+function togglePhase(id){
+  phaseOpen[id]=!phaseOpen[id];
+  const h=document.querySelector(`[onclick="togglePhase('${id}')"]`);
+  const b=document.getElementById('body-'+id);
+  if(phaseOpen[id]){h.classList.add('open');b.classList.add('open');}
+  else{h.classList.remove('open');b.classList.remove('open');}
+}
+
+// KANBAN (P1, P3)
+function renderKanban(stages,phaseId){
+  const cols=stages.map(s=>{
+    const sc=cards.filter(c=>c.stage===s);
+    const cardsHtml=sc.map(c=>renderMiniCard(c,phaseId)).join('');
+    return`<div class="kanban-col">
+      <div class="kanban-col-title">▸${s}<span class="col-count">${sc.length}</span></div>
+      <div class="kanban-drop" data-stage="${s}" data-phase="${phaseId}"
+        ondragover="kanbanDragOver(event)" ondragleave="kanbanDragLeave(event)" ondrop="kanbanDrop(event,this)">
+        ${cardsHtml}
+      </div>
+    </div>`;
+  }).join('');
+  return`<div class="kanban-scroll">${cols}</div>`;
+}
+
+function renderMiniCard(c,phaseId){
+  const d=daysSince(c.deposit);
+  const cls=miniCardCls(d);
+  const badge=c.deposit?urgBadge(d):'';
+  return`<div class="mini-card${cls}" data-id="${c.id}" draggable="true"
+    ontouchstart="touchStart(event,'${c.id}','kanban')" ontouchmove="touchMove(event)" ontouchend="touchEnd(event,'kanban')">
+    <div class="mini-card-name">${c.name}</div>
+    ${badge}
+    <div class="mini-card-edit" onclick="openEdit('${c.id}')">✏️ 編輯</div>
+    <div class="mini-card-hint">⠿ 長按拖曳</div>
+  </div>`;
+}
+
+// FULL STAGES (P2)
+function renderFullStages(stages){
+  return stages.map(s=>{
+    const sc=cards.filter(c=>c.stage===s);
+    return`<div class="stage-group2">
+      <div class="stage-label2">▸ ${s}<span class="stage-cnt">${sc.length}</span></div>
+      <div class="full-drop" data-stage="${s}" data-phase="p2"
+        ondragover="fullDragOver(event)" ondragleave="fullDragLeave(event)" ondrop="fullDrop(event,this)">
+        ${sc.map(c=>renderFullCard(c)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFullCard(c){
+  const d=daysSince(c.deposit);
+  const cls=miniCardCls(d);
+  const todoItems=parseTodos(c.todos);
+  const incompleteTodos=todoItems.filter(t=>!t.done);
+  const incompleteOnly=incompleteTodos;
+  const incompleteTodHtml=incompleteTodos.length?incompleteTodos.slice(0,5).map(t=>'<div>· '+t.text+'</div>').join('')+(incompleteTodos.length>5?'<div style="color:var(--text3);font-size:10px">還有'+(incompleteTodos.length-5)+'項…</div>':''):'<span style="color:var(--green);font-size:11px">✓ 全部完成</span>';
+  const todHtml=todoItems.length?todoItems.map(t=>'<div>· '+t.text+'</div>').join(''):'<span style="color:var(--text3)">無</span>';
+  const buyHtml=c.buys.length?c.buys.map(b=>'<div>· '+b+'</div>').join(''):'<span style="color:var(--text3)">無</span>';
+  const quoteUrls=parseQuoteUrls(c.quote_url);
+  const hasQuote=quoteUrls.length>0;
+  const quoteBtn=hasQuote
+    ?`<span class="file-btn has-file" onclick="openQuoteViewer('${c.id}')">📄 查看報價單（${quoteUrls.length}張）</span>`
+    :`<span class="file-btn upload" onclick="openEdit('${c.id}')">📄 上傳報價單</span>`;
+  const imgs=Array.isArray(c.images3d)&&c.images3d.length>0?c.images3d:(c.images3d&&typeof c.images3d==='string'&&c.images3d!=='[]'?tryParseJSON(c.images3d):[]);
+  const imgGrid=imgs.length?`<div class="img-grid" id="ig-${c.id}">${imgs.map((u,i)=>`<img src="${u}" class="img-thumb" data-cardid="${c.id}" data-idx="${i}">`).join('')}</div>`:'';
+  const v3dBtn=imgs.length
+    ?`<span class="file-btn has-file" onclick="open3DViewer('${c.id}')">🧊 查看3D圖（${imgs.length}張）</span>`
+    :`<span class="file-btn upload" onclick="openEdit('${c.id}')">🧊 上傳3D圖</span>`;
+  return`<div class="card${cls}" data-id="${c.id}" draggable="true"
+    ontouchstart="touchStart(event,'${c.id}','full')" ontouchmove="touchMove(event)" ontouchend="touchEnd(event,'full')">
+    <div class="card-top">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px">
+          <div class="card-name">${c.name}</div>
+          <div style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px">${c.deposit||'未設定'}${urgBadge(d)}</div>
+        </div>
+        <div style="font-size:11px;color:var(--blue);font-weight:500">${c.price?'NT$'+c.price:''}</div>
+      </div>
+      <button class="edit-btn" onclick="openEdit('${c.id}')">✏️</button>
+    </div>
+    <div class="card-files">${quoteBtn}${v3dBtn}</div>
+    ${imgGrid}
+    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div onclick="toggleCardTodo(event,'${c.id}')" style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:3px">
+            <h4 style="font-size:10px;color:var(--text2)">📋 工單</h4>
+            <span id="chev-${c.id}" style="font-size:9px;color:var(--text3)">▾</span>
+          </div>
+          <div id="todo-s-${c.id}" style="font-size:11px;color:var(--text);line-height:1.55">${incompleteTodHtml}</div>
+          <div id="todo-f-${c.id}" style="display:none;font-size:11px;color:var(--text);line-height:1.55">${incompleteOnly.map(t=>'<div>· '+t.text+'</div>').join('')}</div>
+        </div>
+        <div class="mini-list"><h4>🛒 待購買</h4>${buyHtml}</div>
+      </div>
+    </div>
+    <div class="drag-hint">⠿ 長按拖曳移動階段</div>
+  </div>`;
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────
+// Desktop kanban
+function kanbanDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
+function kanbanDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function kanbanDrop(e,zone){e.preventDefault();zone.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');if(id)moveCard(id,zone.dataset.stage);}
+
+// Desktop full
+function fullDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
+function fullDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function fullDrop(e,zone){e.preventDefault();zone.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');if(id)moveCard(id,zone.dataset.stage);}
+
+function bindImgsAndDrag(){bindImgThumbs();bindFullDrag();}
+function bindFullDrag(){
+  document.querySelectorAll('.card[draggable],.mini-card[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',el.dataset.id);setTimeout(()=>el.classList.add('dragging'),0);});
+    el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+  });
+}
+
+// Touch drag (unified)
+let tId=null,tClone=null,tTimer=null,tActive=false,tType=null;
+function touchStart(e,id,type){
+  tTimer=setTimeout(()=>{
+    tActive=true;tId=id;tType=type;
+    const el=e.currentTarget;
+    tClone=el.cloneNode(true);
+    tClone.style.cssText=`position:fixed;z-index:999;width:${el.offsetWidth}px;opacity:0.75;pointer-events:none;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.25)`;
+    document.body.appendChild(tClone);
+    el.classList.add('dragging');
+    showToast('拖曳中…');
+  },500);
+}
+function touchMove(e){
+  if(!tActive)return;e.preventDefault();
+  const t=e.touches[0];
+  if(tClone){tClone.style.left=(t.clientX-60)+'px';tClone.style.top=(t.clientY-30)+'px';}
+  const sel=tType==='kanban'?'.kanban-drop':'.full-drop,.kanban-drop';
+  document.querySelectorAll(sel).forEach(z=>{
+    const r=z.getBoundingClientRect();
+    if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom)z.classList.add('drag-over');
+    else z.classList.remove('drag-over');
+  });
+}
+function touchEnd(e,type){
+  clearTimeout(tTimer);
+  if(!tActive){tActive=false;return;}
+  if(tClone){tClone.remove();tClone=null;}
+  document.querySelectorAll('.dragging').forEach(c=>c.classList.remove('dragging'));
+  const active=document.querySelector('.drag-over');
+  if(active&&tId){moveCard(tId,active.dataset.stage);active.classList.remove('drag-over');}
+  else document.querySelectorAll('.drag-over').forEach(z=>z.classList.remove('drag-over'));
+  tActive=false;tId=null;
+}
+
+// ── TODO ─────────────────────────────────────────────────────
+function renderTodo(){
+  const con=document.getElementById('page-todo');
+  const w=cards.filter(c=>c.buys.length);
+  if(!w.length){con.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">🛒 目前沒有待購買項目</div>';return;}
+  let h=`<div class="todo-section"><div class="sec-title">🛒 待購買清單（外出採購用）</div>`;
+  w.forEach(c=>{
+    h+=`<div class="todo-card"><div class="todo-shop">🏪 ${c.name} <span style="color:var(--text3);font-weight:400">・${c.stage}</span></div>`;
+    c.buys.forEach(b=>h+=`<div class="todo-item"><div class="chk" onclick="toggleChk(this)"></div><span>${b}</span></div>`);
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+  con.innerHTML=h;
+}
+function toggleChk(el){el.classList.toggle('done');el.textContent=el.classList.contains('done')?'✓':'';el.nextElementSibling?.classList.toggle('done-txt');}
+
+// ── LOGOS ─────────────────────────────────────────────────────
+async function handleLogoFileSelect(){
+  const f=document.getElementById('l-file').files[0];if(!f)return;
+  document.getElementById('l-file-prog').style.display='block';
+  const ext=f.name.split('.').pop();
+  const filename='logo_'+Date.now()+'.'+ext;
+  const{data,error}=await sb.storage.from('assets').upload(filename,f,{upsert:true});
+  document.getElementById('l-file-prog').style.display='none';
+  if(error){showToast('上傳失敗：'+error.message);console.error(error);return;}
+  const url=sb.storage.from('assets').getPublicUrl(filename).data.publicUrl;
+  document.getElementById('l-url').value=url;
+  document.getElementById('l-preview').innerHTML='<img src="'+url+'" style="max-height:80px;border-radius:6px;border:1px solid var(--border)">';
+  showToast('圖片上傳成功');
+}
+async function saveLogo(){
+  const name=document.getElementById('l-name').value.trim();if(!name){showToast('請輸入名稱');return;}
+  const url=document.getElementById('l-url').value.trim();
+  if(!url){showToast('請先上傳圖片');return;}
+  const obj={name,url,bg:'#F5F4F0',fg:'#1A1A18'};
+  let result;
+  if(editingLogoId){
+    result=await sb.from('logos').update(obj).eq('id',editingLogoId).select();
+  } else {
+    result=await sb.from('logos').insert(obj).select();
+  }
+  if(result.error){showToast('儲存失敗：'+result.error.message);return;}
+  // Directly update local array and re-render without waiting for Realtime
+  if(editingLogoId){
+    logos=logos.map(l=>l.id===editingLogoId?{...l,...obj}:l);
+  } else {
+    const newLogo=result.data&&result.data[0]?result.data[0]:{id:Date.now(),...obj};
+    logos=[...logos,newLogo];
+  }
+  closeModal('modal-logo');
+  renderLogos();
+  showToast(editingLogoId?'已更新':'已新增');
+}
+async function deleteLogo(){
+  if(!confirm('確定刪除？'))return;
+  await sb.from('logos').delete().eq('id',editingLogoId);
+  logos=logos.filter(l=>l.id!==editingLogoId);
+  closeModal('modal-logo');
+  renderLogos();
+  showToast('已刪除');
+}
+function fixLogoUrl(url){
+  if(!url)return url;
+  return url.replace('/public/assets/assets/','/public/assets/');
+}
+let _logoEditMode=false;
+function openLogoEditMode(){
+  _logoEditMode=!_logoEditMode;
+  renderLogos();
+}
+function renderLogos(){
+  const con=document.getElementById('logo-list');
+  if(!con)return;
+  if(!logos.length){
+    con.style.display='block';
+    con.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3);font-size:12px;grid-column:span 3">尚無 LOGO，點右上角新增</div>';
+    return;
+  }
+  con.style.display='grid';
+  con.innerHTML=logos.map(l=>{
+    const url=fixLogoUrl(l.url);
+    return`<div style="position:relative;cursor:pointer" onclick="${_logoEditMode?`openLogoEdit('${l.id}')`:`copyLogoImg('${l.id}')`}">
+      <div style="width:100%;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#F5F4F0;display:flex;align-items:center;justify-content:center">
+        ${url?`<img src="${url}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='?'">`:'<span style="color:var(--text3);font-size:12px">?</span>'}
+      </div>
+      <div style="font-size:10px;color:var(--text2);text-align:center;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name}</div>
+      ${_logoEditMode?`<div style="position:absolute;top:4px;right:4px;background:var(--blue);color:white;font-size:9px;padding:2px 5px;border-radius:4px">編輯</div>`:''}
+    </div>`;
+  }).join('');
+}
+async function copyLogoImg(id){
+  const l=logos.find(x=>x.id===id);
+  if(!l?.url){showToast('尚未設定圖片');return;}
+  const url=fixLogoUrl(l.url);
+  try{
+    const res=await fetch(url);
+    const blob=await res.blob();
+    await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]);
+    showToast('已複製圖片！可直接貼上');
+  }catch(e){
+    // Fallback: copy URL
+    if(navigator.clipboard)navigator.clipboard.writeText(url);
+    showToast('已複製圖片網址（此裝置不支援直接複製圖片）');
+  }
+}
+function openLogoAdd(){editingLogoId=null;document.getElementById('logo-modal-title').textContent='新增 LOGO';document.getElementById('l-name').value='';document.getElementById('l-url').value='';document.getElementById('l-file').value='';document.getElementById('l-preview').innerHTML='';document.getElementById('logo-del-btn').style.display='none';openModal('modal-logo');}
+function openLogoEdit(id){const l=logos.find(x=>x.id===id);if(!l)return;editingLogoId=id;document.getElementById('logo-modal-title').textContent='編輯 LOGO';document.getElementById('l-name').value=l.name;document.getElementById('l-url').value=l.url||'';document.getElementById('l-file').value='';document.getElementById('l-preview').innerHTML=l.url?`<img src="${l.url}" style="max-height:80px;border-radius:6px;border:1px solid var(--border)">`:'';document.getElementById('logo-del-btn').style.display='block';openModal('modal-logo');}
+function copyLogoUrl(id){copyLogoImg(id);}
+
+// ── EDIT MODAL ────────────────────────────────────────────────
+function openEdit(id){
+  editingId=id;editPendingQuote=null;editPending3D=[];
+  // 完整清空 AI 和報價單狀態
+  window._pendingQuoteFiles=null;
+  window._pendingQuoteUrls=null;
+  document.getElementById('ai-parse-row').style.display='none';
+  document.getElementById('e-quote-preview').innerHTML='';
+  const aiBtn=document.getElementById('ai-parse-btn');
+  aiBtn.textContent='✨ AI 自動讀取報價單，填入待辦事項';
+  aiBtn.disabled=false;
+  document.getElementById('ai-parse-status').textContent='';
+  document.getElementById('e-quote').value='';
+  const c=cards.find(x=>x.id===id);if(!c)return;
+  document.getElementById('edit-title').innerHTML=`編輯：${c.name} <button class="modal-x" onclick="closeModal('modal-edit')">×</button>`;
+  document.getElementById('e-name').value=c.name;
+  document.getElementById('e-stage').value=c.stage||'接洽中';
+  document.getElementById('e-price').value=c.price||'';
+  document.getElementById('e-deposit').value=c.deposit||'';
+  document.getElementById('e-todo').value=c.todos.join('\n');
+  _editTodos=c.todos.length?parseTodos(c.todos):[];
+  renderEditChecklist(_editTodos);
+  document.getElementById('ai-parse-row').style.display='none';
+  document.getElementById('e-quote-preview').innerHTML='';
+  document.getElementById('e-buy').value=c.buys.join('\n');
+  document.getElementById('e-3d-preview').innerHTML='';
+  const curQuoteUrls=parseQuoteUrls(c.quote_url);
+  const qCurCon=document.getElementById('e-quote-current');
+  if(curQuoteUrls.length){
+    qCurCon.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">目前報價單（${curQuoteUrls.length}張）：</div><div style="display:flex;gap:6px;flex-wrap:wrap">${curQuoteUrls.map((u,i)=>`<img src="${u}" data-curidx="${i}" style="height:60px;border-radius:6px;border:1px solid var(--border);cursor:pointer">`).join('')}</div>`;
+    qCurCon.querySelectorAll('img').forEach(img=>img.addEventListener('click',()=>{
+      viewImageArr(curQuoteUrls,parseInt(img.dataset.curidx));
+    }));
+  } else {
+    qCurCon.innerHTML='';
+  }
+  const imgs=Array.isArray(c.images3d)?c.images3d:(c.images3d&&typeof c.images3d==='string'&&c.images3d!=='[]'&&c.images3d!=='null'?tryParseJSON(c.images3d):[]);
+  const e3dCon=document.getElementById('e-3d-current');
+  if(imgs.length){
+    e3dCon.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">目前${imgs.length}張：</div><div style="display:flex;gap:5px;flex-wrap:wrap">${imgs.map((u,i)=>`<img src="${u}" data-editidx="${i}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer">`).join('')}</div>`;
+    e3dCon.querySelectorAll('img').forEach(img=>img.addEventListener('click',()=>{
+      viewImageArr(imgs,parseInt(img.dataset.editidx));
+    }));
+  } else {
+    e3dCon.innerHTML='';
+  }
+  openModal('modal-edit');
+}
+
+// ── TODOS PARSE (stored as "text||done" per line) ─────────────
+function parseTodos(arr){
+  return arr.map(t=>{
+    if(typeof t==='object')return t;
+    if(t.startsWith('✓')){return{text:t.slice(1).trim(),done:true};}
+    return{text:t,done:false};
+  });
+}
+function todosToStrings(items){return items.map(t=>(t.done?'✓':'')+t.text);}
+
+// ── CHECKLIST in edit modal ───────────────────────────────────
+function renderEditChecklist(items){
+  const con=document.getElementById('e-todo-checklist');
+  if(!con)return;
+  con.innerHTML=items.map((t,i)=>`
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:0.5px solid var(--border)">
+      <div onclick="toggleEditTodo(${i})" style="width:18px;height:18px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;background:${t.done?'var(--blue)':'transparent'};border-color:${t.done?'var(--blue)':'var(--border)'};">${t.done?'<span style=\"color:white\">✓</span>':''}</div>
+      <span style="font-size:13px;color:var(--text);flex:1;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${t.text}</span>
+      <button onclick="removeEditTodo(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>
+    </div>`).join('') +
+    `<div style="display:flex;gap:6px;margin-top:6px">
+      <input id="new-todo-input" placeholder="新增工單項目…" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:var(--font);background:var(--card);color:var(--text)" onkeydown="if(event.key==='Enter')addEditTodo()">
+      <button onclick="addEditTodo()" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px">新增</button>
+    </div>`;
+  syncEditTodoHidden(items);
+}
+
+let _editTodos=[];
+function toggleEditTodo(i){_editTodos[i].done=!_editTodos[i].done;renderEditChecklist(_editTodos);}
+function removeEditTodo(i){_editTodos.splice(i,1);renderEditChecklist(_editTodos);}
+function addEditTodo(){
+  const inp=document.getElementById('new-todo-input');
+  const txt=inp.value.trim();if(!txt)return;
+  _editTodos.push({text:txt,done:false});
+  inp.value='';renderEditChecklist(_editTodos);
+}
+function syncEditTodoHidden(items){
+  const h=document.getElementById('e-todo');
+  if(h)h.value=todosToStrings(items).join('\n');
+}
+
+// ── IMAGE VIEWER with swipe ───────────────────────────────────
+let _viewerImages=[];let _viewerIdx=0;let _vTouchX=null;
+function viewImageArr(arr,idx){
+  _viewerImages=arr&&arr.length?arr:[];
+  _viewerIdx=idx||0;
+  if(_viewerIdx>=_viewerImages.length)_viewerIdx=0;
+  updateViewer();
+  document.getElementById('viewer').classList.add('open');
+}
+function viewImage(src,allImgs){
+  const arr=allImgs&&allImgs.length?allImgs:[src];
+  const idx=arr.indexOf(src);
+  viewImageArr(arr,idx<0?0:idx);
+}
+function updateViewer(){
+  document.getElementById('viewer-img').src=_viewerImages[_viewerIdx];
+  const cnt=document.getElementById('viewer-counter');
+  cnt.textContent=_viewerImages.length>1?(_viewerIdx+1)+' / '+_viewerImages.length:'';
+  document.getElementById('viewer-prev').style.display=_viewerImages.length>1?'flex':'none';
+  document.getElementById('viewer-next').style.display=_viewerImages.length>1?'flex':'none';
+}
+function viewerNav(dir){
+  _viewerIdx=(_viewerIdx+dir+_viewerImages.length)%_viewerImages.length;
+  updateViewer();
+}
+function closeViewer(){document.getElementById('viewer').classList.remove('open');}
+function handleViewerBgClick(e){if(e.target===document.getElementById('viewer'))closeViewer();}
+// Touch swipe
+document.addEventListener('touchstart',function(e){
+  if(document.getElementById('viewer').classList.contains('open'))_vTouchX=e.touches[0].clientX;
+},{passive:true});
+document.addEventListener('touchend',function(e){
+  if(!document.getElementById('viewer').classList.contains('open')||_vTouchX===null)return;
+  const dx=e.changedTouches[0].clientX-_vTouchX;
+  _vTouchX=null;
+  if(Math.abs(dx)>50)viewerNav(dx<0?1:-1);
+},{passive:true});
+
+// ── UTILS ─────────────────────────────────────────────────────
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function handleModalBgClick(e,id){if(e.target===document.getElementById(id))closeModal(id);}
+function toggleCardTodo(e,id){
+  e.stopPropagation();
+  const s=document.getElementById('todo-s-'+id);
+  const f=document.getElementById('todo-f-'+id);
+  const chev=document.getElementById('chev-'+id);
+  if(!s||!f)return;
+  const isCollapsed=f.style.display==='none';
+  s.style.display=isCollapsed?'none':'block';
+  f.style.display=isCollapsed?'block':'none';
+  if(chev)chev.textContent=isCollapsed?'▴':'▾';
+}
+function switchPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='todo')renderTodo();
+  if(name==='company')loadLogos();
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2200);}
+function shareCard(type){
+  if(type==='line'){
+    const txt='向東車庫 Eastward\n負責人：陳冠宇\n電話：0956-235868\nEmail：eastward25@gmail.com\n行動餐車改裝・室內設計\nhttps://goeast.tw/';
+    if(navigator.clipboard)navigator.clipboard.writeText(txt);
+    window.open('https://line.me/R/share?text='+encodeURIComponent(txt));
+  } else if(type==='download'){
+    const imgUrl='https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/KuanYunamecard.png';
+    const a=document.createElement('a');
+    a.href=imgUrl;
+    a.download='向東車庫名片_陳冠宇.png';
+    a.target='_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('下載中…');
+  }
+}
+
+function open3DViewer(cardId){
+  const c=cards.find(x=>x.id===cardId);
+  if(!c)return;
+  const imgs=Array.isArray(c.images3d)?c.images3d:[];
+  if(imgs.length)viewImageArr(imgs,0);
+}
+function bindImgThumbs(){
+  document.querySelectorAll('.img-thumb[data-cardid]').forEach(img=>{
+    img.addEventListener('click',function(){
+      const c=cards.find(x=>x.id===this.dataset.cardid);
+      if(!c)return;
+      const imgs=Array.isArray(c.images3d)?c.images3d:[];
+      viewImageArr(imgs,parseInt(this.dataset.idx)||0);
+    });
+  });
+}
+
+function parseQuoteUrls(val){
+  if(!val||val==='null')return[];
+  try{
+    const p=JSON.parse(val);
+    if(Array.isArray(p))return p.filter(Boolean);
+    if(typeof p==='string'&&p.startsWith('http'))return[p];
+  }catch(e){}
+  if(typeof val==='string'&&val.startsWith('http'))return[val];
+  return[];
+}
+function openQuoteViewer(cardId){
+  const c=cards.find(x=>x.id===cardId);
+  if(!c)return;
+  const urls=parseQuoteUrls(c.quote_url);
+  if(urls.length)viewImageArr(urls,0);
+}
+
+initAuth();
+</script>
+</body>
+</html>

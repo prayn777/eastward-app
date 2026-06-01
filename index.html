@@ -254,7 +254,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 <div class="viewer-bg" id="viewer" onclick="handleViewerBgClick(event)">
   <button class="viewer-close" onclick="closeViewer()">×</button>
   <button id="viewer-prev" onclick="event.stopPropagation();viewerNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;color:white;font-size:32px;cursor:pointer;padding:8px 14px;border-radius:8px;z-index:10">‹</button>
-  <img id="viewer-img" src="" alt="" onclick="event.stopPropagation()" style="max-width:88vw;max-height:86vh;object-fit:contain;border-radius:8px">
+  <div id="viewer-img-wrap" style="overflow:hidden;display:flex;align-items:center;justify-content:center;max-width:88vw;max-height:86vh">
+    <img id="viewer-img" src="" alt="" onclick="event.stopPropagation()" style="max-width:88vw;max-height:86vh;object-fit:contain;border-radius:8px;touch-action:none;transform-origin:center center;transition:transform 0.1s">
+  </div>
   <button id="viewer-next" onclick="event.stopPropagation();viewerNav(1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;color:white;font-size:32px;cursor:pointer;padding:8px 14px;border-radius:8px;z-index:10">›</button>
   <div id="viewer-counter" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:white;font-size:12px;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:10px"></div>
 </div>
@@ -842,8 +844,52 @@ function renderTodo(){
     h+=`</div>`;
   });
   h+=`</div>`;
+  // Add inventory section
+  h+=renderInventorySection();
   con.innerHTML=h;
+  // Bind inventory item events after render
+  bindInventoryEvents();
 }
+
+function renderInventorySection(){
+  const undone=inventory.filter(i=>!i.done);
+  const done=inventory.filter(i=>i.done);
+  let h=`<div class="todo-section">
+    <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>📦 材料庫存採購</span>
+      <span style="font-size:10px;color:var(--text3);font-weight:400">與專案無關的庫存補充</span>
+    </div>
+    <div style="background:var(--card);border-radius:10px;border:1px solid var(--border);padding:11px;margin-bottom:7px">`;
+  if(undone.length){
+    undone.forEach(item=>{
+      h+=`<div class="todo-item">
+        <div class="chk" data-inv-id="${item.id}" onclick="toggleInventory('${item.id}')"></div>
+        <span>${item.text}</span>
+        <button onclick="deleteInventory('${item.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;margin-left:auto;padding:0">×</button>
+      </div>`;
+    });
+  } else {
+    h+=`<div style="font-size:12px;color:var(--text3);padding:4px 0">目前沒有庫存採購項目</div>`;
+  }
+  if(done.length){
+    h+=`<div style="font-size:10px;color:var(--text3);margin:8px 0 4px;border-top:1px solid var(--border);padding-top:6px">已完成 ${done.length} 項</div>`;
+    done.forEach(item=>{
+      h+=`<div class="todo-item" style="opacity:0.5">
+        <div class="chk done" onclick="toggleInventory('${item.id}')">✓</div>
+        <span style="text-decoration:line-through;color:var(--text3)">${item.text}</span>
+        <button onclick="deleteInventory('${item.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;margin-left:auto;padding:0">×</button>
+      </div>`;
+    });
+  }
+  h+=`<div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+      <input id="inv-input" placeholder="新增庫存採購項目…" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:var(--font);background:var(--card);color:var(--text)" onkeydown="if(event.key==='Enter')addInventory()">
+      <button onclick="addInventory()" style="padding:7px 14px;background:var(--blue);color:white;border:none;border-radius:7px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:500">新增</button>
+    </div>
+  </div></div>`;
+  return h;
+}
+
+function bindInventoryEvents(){}
 function toggleChk(el){el.classList.toggle('done');el.textContent=el.classList.contains('done')?'✓':'';el.nextElementSibling?.classList.toggle('done-txt');}
 
 async function toggleBuyItem(el,cardId,itemText){
@@ -1135,12 +1181,48 @@ function viewImage(src,allImgs){
   viewImageArr(arr,idx<0?0:idx);
 }
 function updateViewer(){
-  document.getElementById('viewer-img').src=_viewerImages[_viewerIdx];
+  const img=document.getElementById('viewer-img');
+  img.src=_viewerImages[_viewerIdx];
+  img.style.transform='scale(1)';
+  _imgScale=1;_imgX=0;_imgY=0;
   const cnt=document.getElementById('viewer-counter');
   cnt.textContent=_viewerImages.length>1?(_viewerIdx+1)+' / '+_viewerImages.length:'';
   document.getElementById('viewer-prev').style.display=_viewerImages.length>1?'flex':'none';
   document.getElementById('viewer-next').style.display=_viewerImages.length>1?'flex':'none';
 }
+
+// Pinch to zoom
+let _imgScale=1,_imgX=0,_imgY=0,_lastDist=0,_pinching=false;
+document.addEventListener('touchstart',e=>{
+  if(!document.getElementById('viewer').classList.contains('open'))return;
+  if(e.touches.length===2){
+    _pinching=true;
+    _lastDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    e.preventDefault();
+  }
+},{passive:false});
+document.addEventListener('touchmove',e=>{
+  if(!document.getElementById('viewer').classList.contains('open'))return;
+  if(e.touches.length===2&&_pinching){
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const delta=dist/_lastDist;
+    _imgScale=Math.min(Math.max(_imgScale*delta,1),5);
+    _lastDist=dist;
+    const img=document.getElementById('viewer-img');
+    img.style.transform=`scale(${_imgScale})`;
+    img.style.transition='none';
+    e.preventDefault();
+  }
+},{passive:false});
+document.addEventListener('touchend',e=>{
+  if(e.touches.length<2)_pinching=false;
+  if(_imgScale<=1){
+    const img=document.getElementById('viewer-img');
+    _imgScale=1;
+    img.style.transform='scale(1)';
+    img.style.transition='transform 0.2s';
+  }
+},{passive:true});
 function viewerNav(dir){
   _viewerIdx=(_viewerIdx+dir+_viewerImages.length)%_viewerImages.length;
   updateViewer();
@@ -1178,7 +1260,7 @@ function switchPage(name,btn){
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   btn.classList.add('active');
-  if(name==='todo')renderTodo();
+  if(name==='todo'){loadInventory().then(()=>renderTodo());}
   if(name==='company')loadLogos();
   if(name==='logs')renderLogs();
 }
@@ -1297,6 +1379,41 @@ async function renderLogs(){
     h+=`</div>`;
   });
   con.innerHTML=h;
+}
+
+// ── INVENTORY ────────────────────────────────────────────────
+async function loadInventory(){
+  const{data,error}=await sb.from('inventory').select('*').order('created_at');
+  if(!error){inventory=data||[];}
+}
+
+async function addInventory(){
+  const inp=document.getElementById('inv-input');
+  if(!inp)return;
+  const text=inp.value.trim();
+  if(!text){showToast('請輸入項目');return;}
+  const{data,error}=await sb.from('inventory').insert({text,done:false}).select();
+  if(error){showToast('新增失敗');return;}
+  inventory=[...inventory,...(data||[])];
+  inp.value='';
+  renderTodo();
+  showToast('已新增：'+text);
+}
+
+async function toggleInventory(id){
+  const item=inventory.find(i=>i.id===id);
+  if(!item)return;
+  const newDone=!item.done;
+  await sb.from('inventory').update({done:newDone}).eq('id',id);
+  inventory=inventory.map(i=>i.id===id?{...i,done:newDone}:i);
+  renderTodo();
+  if(newDone)showToast('✓ 已採購');
+}
+
+async function deleteInventory(id){
+  await sb.from('inventory').delete().eq('id',id);
+  inventory=inventory.filter(i=>i.id!==id);
+  renderTodo();
 }
 
 initAuth();

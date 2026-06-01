@@ -1183,46 +1183,127 @@ function viewImage(src,allImgs){
 function updateViewer(){
   const img=document.getElementById('viewer-img');
   img.src=_viewerImages[_viewerIdx];
-  img.style.transform='scale(1)';
-  _imgScale=1;_imgX=0;_imgY=0;
+  resetImgTransform(false);
   const cnt=document.getElementById('viewer-counter');
   cnt.textContent=_viewerImages.length>1?(_viewerIdx+1)+' / '+_viewerImages.length:'';
   document.getElementById('viewer-prev').style.display=_viewerImages.length>1?'flex':'none';
   document.getElementById('viewer-next').style.display=_viewerImages.length>1?'flex':'none';
 }
 
-// Pinch to zoom
-let _imgScale=1,_imgX=0,_imgY=0,_lastDist=0,_pinching=false;
-document.addEventListener('touchstart',e=>{
-  if(!document.getElementById('viewer').classList.contains('open'))return;
-  if(e.touches.length===2){
-    _pinching=true;
-    _lastDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    e.preventDefault();
-  }
-},{passive:false});
-document.addEventListener('touchmove',e=>{
-  if(!document.getElementById('viewer').classList.contains('open'))return;
-  if(e.touches.length===2&&_pinching){
-    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    const delta=dist/_lastDist;
-    _imgScale=Math.min(Math.max(_imgScale*delta,1),5);
-    _lastDist=dist;
-    const img=document.getElementById('viewer-img');
-    img.style.transform=`scale(${_imgScale})`;
-    img.style.transition='none';
-    e.preventDefault();
-  }
-},{passive:false});
-document.addEventListener('touchend',e=>{
-  if(e.touches.length<2)_pinching=false;
-  if(_imgScale<=1){
-    const img=document.getElementById('viewer-img');
-    _imgScale=1;
-    img.style.transform='scale(1)';
-    img.style.transition='transform 0.2s';
-  }
-},{passive:true});
+// ── PINCH ZOOM + PAN (iPhone Photos style) ───────────────────
+let _imgScale=1,_imgTX=0,_imgTY=0;
+let _lastDist=0,_lastMidX=0,_lastMidY=0;
+let _pinching=false,_panning=false;
+let _panStartX=0,_panStartY=0,_panBaseX=0,_panBaseY=0;
+let _vSwipeStartX=0,_vSwipeStartY=0,_vSwipeActive=false;
+
+function applyImgTransform(transition){
+  const img=document.getElementById('viewer-img');
+  if(!img)return;
+  img.style.transition=transition?'transform 0.2s':'none';
+  img.style.transform=`translate(${_imgTX}px,${_imgTY}px) scale(${_imgScale})`;
+}
+
+function clampPan(){
+  const img=document.getElementById('viewer-img');
+  if(!img)return;
+  const w=img.naturalWidth||img.offsetWidth;
+  const h=img.naturalHeight||img.offsetHeight;
+  const dw=img.offsetWidth;
+  const dh=img.offsetHeight;
+  const maxX=Math.max(0,(dw*_imgScale-dw)/2);
+  const maxY=Math.max(0,(dh*_imgScale-dh)/2);
+  _imgTX=Math.min(maxX,Math.max(-maxX,_imgTX));
+  _imgTY=Math.min(maxY,Math.max(-maxY,_imgTY));
+}
+
+function resetImgTransform(animate){
+  _imgScale=1;_imgTX=0;_imgTY=0;
+  applyImgTransform(animate);
+}
+
+(function bindViewerTouch(){
+  const viewerEl=document.getElementById('viewer');
+  if(!viewerEl){setTimeout(bindViewerTouch,300);return;}
+
+  viewerEl.addEventListener('touchstart',e=>{
+    if(!viewerEl.classList.contains('open'))return;
+    if(e.touches.length===2){
+      _pinching=true;_panning=false;_vSwipeActive=false;
+      _lastDist=Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
+      _lastMidX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      _lastMidY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      e.preventDefault();
+    } else if(e.touches.length===1){
+      if(_imgScale>1){
+        // pan mode
+        _panning=true;_vSwipeActive=false;
+        _panStartX=e.touches[0].clientX;
+        _panStartY=e.touches[0].clientY;
+        _panBaseX=_imgTX;
+        _panBaseY=_imgTY;
+      } else {
+        // swipe mode for next/prev
+        _vSwipeActive=true;_panning=false;
+        _vSwipeStartX=e.touches[0].clientX;
+        _vSwipeStartY=e.touches[0].clientY;
+      }
+    }
+  },{passive:false});
+
+  viewerEl.addEventListener('touchmove',e=>{
+    if(!viewerEl.classList.contains('open'))return;
+    if(e.touches.length===2&&_pinching){
+      const dist=Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
+      const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const delta=dist/_lastDist;
+      const newScale=Math.min(Math.max(_imgScale*delta,1),6);
+      // Adjust translation so zoom anchors at pinch midpoint
+      const img=document.getElementById('viewer-img');
+      const rect=img.getBoundingClientRect();
+      const originX=midX-rect.left-rect.width/2;
+      const originY=midY-rect.top-rect.height/2;
+      _imgTX+=originX*(delta-1)+(midX-_lastMidX);
+      _imgTY+=originY*(delta-1)+(midY-_lastMidY);
+      _imgScale=newScale;
+      _lastDist=dist;_lastMidX=midX;_lastMidY=midY;
+      clampPan();
+      applyImgTransform(false);
+      e.preventDefault();
+    } else if(e.touches.length===1&&_panning){
+      _imgTX=_panBaseX+(e.touches[0].clientX-_panStartX);
+      _imgTY=_panBaseY+(e.touches[0].clientY-_panStartY);
+      clampPan();
+      applyImgTransform(false);
+      e.preventDefault();
+    }
+  },{passive:false});
+
+  viewerEl.addEventListener('touchend',e=>{
+    if(!viewerEl.classList.contains('open'))return;
+    if(e.touches.length<2&&_pinching){
+      _pinching=false;
+      if(_imgScale<1.05){resetImgTransform(true);}
+      else clampPan();
+    }
+    if(e.touches.length===0&&_vSwipeActive){
+      _vSwipeActive=false;
+      const dx=e.changedTouches[0].clientX-_vSwipeStartX;
+      const dy=Math.abs(e.changedTouches[0].clientY-_vSwipeStartY);
+      if(Math.abs(dx)>50&&dy<40&&_imgScale<=1.05){
+        viewerNav(dx<0?1:-1);
+      }
+    }
+    if(e.touches.length===0)_panning=false;
+  },{passive:true});
+})();
 function viewerNav(dir){
   _viewerIdx=(_viewerIdx+dir+_viewerImages.length)%_viewerImages.length;
   updateViewer();

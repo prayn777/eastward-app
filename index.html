@@ -1310,16 +1310,7 @@ function viewerNav(dir){
 }
 function closeViewer(){document.getElementById('viewer').classList.remove('open');}
 function handleViewerBgClick(e){if(e.target===document.getElementById('viewer'))closeViewer();}
-// Touch swipe
-document.addEventListener('touchstart',function(e){
-  if(document.getElementById('viewer').classList.contains('open'))_vTouchX=e.touches[0].clientX;
-},{passive:true});
-document.addEventListener('touchend',function(e){
-  if(!document.getElementById('viewer').classList.contains('open')||_vTouchX===null)return;
-  const dx=e.changedTouches[0].clientX-_vTouchX;
-  _vTouchX=null;
-  if(Math.abs(dx)>50)viewerNav(dx<0?1:-1);
-},{passive:true});
+// Touch swipe handled inside bindViewerTouch only
 
 // ── UTILS ─────────────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}

@@ -1222,11 +1222,11 @@ function resetImgTransform(animate){
   applyImgTransform(animate);
 }
 
-(function bindViewerTouch(){
-  const viewerEl=document.getElementById('viewer');
-  if(!viewerEl){setTimeout(bindViewerTouch,300);return;}
-
-  viewerEl.addEventListener('touchstart',e=>{
+(function initViewerTouch(){
+  function tryBind(){
+    const viewerEl=document.getElementById('viewer');
+    if(!viewerEl){setTimeout(tryBind,200);return;}
+    viewerEl.addEventListener('touchstart',e=>{
     if(!viewerEl.classList.contains('open'))return;
     if(e.touches.length===2){
       _pinching=true;_panning=false;_vSwipeActive=false;
@@ -1303,13 +1303,18 @@ function resetImgTransform(animate){
     }
     if(e.touches.length===0)_panning=false;
   },{passive:true});
+  }
+  tryBind();
 })();
 function viewerNav(dir){
   _viewerIdx=(_viewerIdx+dir+_viewerImages.length)%_viewerImages.length;
   updateViewer();
 }
 function closeViewer(){document.getElementById('viewer').classList.remove('open');}
-function handleViewerBgClick(e){if(e.target===document.getElementById('viewer'))closeViewer();}
+function handleViewerBgClick(e){
+  if(_imgScale>1.05)return; // don't close when zoomed
+  if(e.target===document.getElementById('viewer'))closeViewer();
+}
 // Touch swipe handled inside bindViewerTouch only
 
 // ── UTILS ─────────────────────────────────────────────────────

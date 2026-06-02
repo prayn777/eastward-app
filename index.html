@@ -534,20 +534,27 @@ function openViewerFromNewQuote(idx){
   viewImageArr(window._pendingQuoteUrls||[],idx);
 }
 
-function getAnthropicKey(){
-  return localStorage.getItem('eastward_ai_key')||'';
+let _cachedApiKey=null;
+async function getAnthropicKey(){
+  if(_cachedApiKey)return _cachedApiKey;
+  try{
+    const{data}=await sb.from('settings').select('value').eq('key','anthropic_key').single();
+    _cachedApiKey=data?.value||'';
+  }catch(e){_cachedApiKey='';}
+  return _cachedApiKey;
 }
-function setAnthropicKey(key){
-  localStorage.setItem('eastward_ai_key',key);
+async function setAnthropicKey(key){
+  _cachedApiKey=key;
+  await sb.from('settings').upsert({key:'anthropic_key',value:key});
 }
 
 async function parseQuoteWithAI(){
   // Check for API key
-  let key=getAnthropicKey();
+  let key=await getAnthropicKey();
   if(!key){
-    key=prompt('請輸入 Anthropic API Key（只需輸入一次，會記住在此裝置）：');
+    key=prompt('請輸入 Anthropic API Key（只需輸入一次，會記住在所有裝置）：');
     if(!key)return;
-    setAnthropicKey(key.trim());
+    await setAnthropicKey(key.trim());
   }
   const files=window._pendingQuoteFiles;
   if(!files||!files.length){showToast('請先上傳報價單圖片');return;}

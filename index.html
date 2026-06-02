@@ -300,6 +300,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   </div>
   <div class="form-row"><label>總報價（NT$）</label><input id="e-price"/></div>
   <div class="form-row"><label>付訂金日期</label><input type="date" id="e-deposit"/></div>
+  <div class="form-row"><label>🪵 板材</label><input id="e-material" placeholder="例：12mm 夾板、白橡木貼皮…"/></div>
+  <div class="form-row" id="site-date-row" style="display:none"><label>📅 預計到現場日</label><input type="date" id="e-site-date"/></div>
   <div class="form-row">
     <label>報價單圖片（可上傳多張，例如截圖兩頁）</label>
     <input type="file" id="e-quote" accept="image/*" multiple onchange="handleQuoteSelect()"/>
@@ -420,7 +422,9 @@ async function loadCards(){
     cards=data.map(c=>({...c,
       todos:c.todos?c.todos.split('\n').filter(Boolean):[],
       buys:c.buys?c.buys.split('\n').filter(Boolean):[],
-      images3d:c.images3d&&c.images3d!=='[]'&&c.images3d!=='null'?tryParseJSON(c.images3d):[]
+      images3d:c.images3d&&c.images3d!=='[]'&&c.images3d!=='null'?tryParseJSON(c.images3d):[],
+      material:c.material||'',
+      site_date:c.site_date||null
     }));
     renderSchedule();
     if(document.getElementById('page-todo').classList.contains('active'))renderTodo();
@@ -470,6 +474,8 @@ async function saveEdit(){
     stage:document.getElementById('e-stage').value,
     price:document.getElementById('e-price').value.trim(),
     deposit:document.getElementById('e-deposit').value||null,
+    material:document.getElementById('e-material').value.trim(),
+    site_date:document.getElementById('e-site-date').value||null,
     todos:document.getElementById('e-todo').value.trim(),
     buys:document.getElementById('e-buy').value.trim(),
     images3d:JSON.stringify(allImgs)};
@@ -703,10 +709,14 @@ function renderMiniCard(c,phaseId){
   const d=daysSince(c.deposit);
   const cls=miniCardCls(d);
   const badge=c.deposit?urgBadge(d):'';
+  const materialHtml=c.material?`<div style="font-size:10px;color:var(--text2);margin-top:3px">🪵 ${c.material}</div>`:'';
+  const siteDateHtml=(c.stage==='等現場'&&c.site_date)?`<div style="font-size:10px;color:var(--amber);margin-top:2px">📅 到現場：${c.site_date}</div>`:'';
   return`<div class="mini-card${cls}" data-id="${c.id}" draggable="true"
     ontouchstart="touchStart(event,'${c.id}','kanban')" ontouchmove="touchMove(event)" ontouchend="touchEnd(event,'kanban')">
     <div class="mini-card-name">${c.name}</div>
     ${badge}
+    ${materialHtml}
+    ${siteDateHtml}
     <div class="mini-card-edit" onclick="openEdit('${c.id}')">✏️ 編輯</div>
     <div class="mini-card-hint">⠿ 長按拖曳</div>
   </div>`;
@@ -756,6 +766,7 @@ function renderFullCard(c){
           <div style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px">${c.deposit||'未設定'}${urgBadge(d)}</div>
         </div>
         <div style="font-size:11px;color:var(--blue);font-weight:500">${c.price?'NT$'+c.price:''}</div>
+        ${c.material?`<div style="font-size:10px;color:var(--text2);margin-top:2px">🪵 ${c.material}</div>`:''}
       </div>
       <button class="edit-btn" onclick="openEdit('${c.id}')">✏️</button>
     </div>
@@ -1035,6 +1046,14 @@ function openEdit(id){
   document.getElementById('e-stage').value=c.stage||'接洽中';
   document.getElementById('e-price').value=c.price||'';
   document.getElementById('e-deposit').value=c.deposit||'';
+  document.getElementById('e-material').value=c.material||'';
+  document.getElementById('e-site-date').value=c.site_date||'';
+  // 只有「等現場」才顯示預計到現場日
+  document.getElementById('site-date-row').style.display=(c.stage==='等現場')?'block':'none';
+  // 切換階段時動態顯示/隱藏
+  document.getElementById('e-stage').onchange=function(){
+    document.getElementById('site-date-row').style.display=(this.value==='等現場')?'block':'none';
+  };
   document.getElementById('e-todo').value=c.todos.join('\n');
   _editTodos=c.todos.length?parseTodos(c.todos):[];
   renderEditChecklist(_editTodos);

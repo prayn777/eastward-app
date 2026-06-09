@@ -181,6 +181,27 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 
 .toast-wrap{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);z-index:300;pointer-events:none;width:calc(100% - 32px);max-width:398px;display:flex;justify-content:center}
 .toast{background:#2C2C2A;color:white;padding:10px 20px;border-radius:10px;font-size:13px;display:none;text-align:center}
+
+/* GOALS & LEAVE */
+.goal-card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px}
+.goal-section-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px}
+.progress-bar-bg{background:#EDECEA;border-radius:8px;height:18px;overflow:hidden;margin-bottom:6px}
+.progress-bar-fill{height:100%;border-radius:8px;transition:width 0.5s ease;background:var(--blue)}
+.progress-label{font-size:12px;color:var(--text2);margin-bottom:10px}
+.tier-badge{padding:6px 8px;border-radius:8px;font-size:10px;text-align:center;border:1px solid var(--border)}
+.tier-badge.active-tier{border-color:var(--blue);background:var(--blue-light);color:var(--blue);font-weight:700}
+.month-group{margin-bottom:10px}
+.month-label{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
+.month-entry{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.month-entry:last-child{border-bottom:none}
+.entry-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:0 2px;font-family:var(--font)}
+.staff-btn{padding:6px 16px;border:1.5px solid var(--border);border-radius:20px;background:none;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font);color:var(--text2)}
+.staff-btn.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue)}
+.leave-summary-box{background:var(--bg);border-radius:10px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center}
+.leave-stat-val{font-size:18px;font-weight:700;color:var(--text)}
+.leave-stat-lbl{font-size:10px;color:var(--text2);margin-top:2px}
+.leave-entry{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.leave-entry:last-child{border-bottom:none}
 </style>
 </head>
 <body>
@@ -221,33 +242,59 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   <div id="page-schedule" class="page active"><div class="spinner"></div></div>
   <div id="page-todo" class="page"></div>
   <div id="page-logs" class="page"></div>
-  <div id="page-company" class="page">
-    <div class="co-card">
-      <div class="co-title">🌐 官方網站</div>
-      <button class="co-btn wide" onclick="window.open('https://goeast.tw/','_blank')">🔗 goeast.tw</button>
+  <div id="page-goals" class="page">
+    <div class="goal-card">
+      <div class="goal-section-title">📊 業績目標</div>
+      <div id="goal-period-label" style="font-size:11px;color:var(--text2);margin-bottom:10px"></div>
+      <div id="goal-progress-area"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px;margin-bottom:12px" id="goal-tiers"></div>
+      <div id="goal-months-area"></div>
+      <button class="add-btn" onclick="openRevenueModal()">＋ 新增成交金額</button>
     </div>
-    <div class="co-card">
-      <div class="co-title">🪪 陳冠宇 電子名片</div>
-      <img src="https://qiujqhyxmchyqwlrnqpz.supabase.co/storage/v1/object/public/assets/KuanYunamecard.png" class="namecard-img" onclick="viewImage(this.src)" alt="名片">
-      <div class="co-btns">
-        <button class="co-btn" onclick="shareCard('line')"><span style="font-size:20px">💬</span>分享到 LINE</button>
-        <button class="co-btn" onclick="shareCard('download')"><span style="font-size:20px">⬇️</span>下載圖片</button>
+    <div class="goal-card" style="margin-top:10px">
+      <div class="goal-section-title">🗓 特休紀錄</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="staff-btn active" id="staff-btn-蔡頭" onclick="selectStaff('蔡頭',this)">蔡頭</button>
       </div>
-    </div>
-    <div class="co-card">
-      <div class="co-title"><span>🖼 LOGO 管理</span>
-        <button style="font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:var(--font)" onclick="openLogoAdd()">＋ 新增</button>
-      </div>
-      <div class="logo-list" id="logo-list"><div class="spinner"></div></div>
+      <div id="leave-summary"></div>
+      <div id="leave-list"></div>
+      <button class="add-btn" onclick="openLeaveModal()">＋ 新增請假紀錄</button>
     </div>
   </div>
 
   <nav class="nav">
     <button class="active" onclick="switchPage('schedule',this)"><span style="font-size:18px">📋</span>工作排程</button>
     <button onclick="switchPage('todo',this)"><span style="font-size:18px">✅</span>待辦採購</button>
-    <button onclick="switchPage('company',this)"><span style="font-size:18px">🏪</span>公司介紹</button>
+    <button onclick="switchPage('goals',this)"><span style="font-size:18px">🎯</span>目標假勤</button>
     <button onclick="switchPage('logs',this)"><span style="font-size:18px">📝</span>編輯紀錄</button>
   </nav>
+</div>
+
+<!-- REVENUE MODAL -->
+<div class="modal-bg" id="revenue-modal">
+  <div class="modal">
+    <h3>新增成交金額 <button class="modal-x" onclick="closeRevenueModal()">×</button></h3>
+    <div class="form-row"><label>日期</label><input type="date" id="rv-date"/></div>
+    <div class="form-row"><label>店名／客戶名稱</label><input id="rv-label" placeholder="例：原壹郎串燒"/></div>
+    <div class="form-row"><label>成交金額（NT$）</label><input type="number" id="rv-amount" placeholder="例：185000"/></div>
+    <button class="save-btn" onclick="saveRevenue()">儲存</button>
+  </div>
+</div>
+
+<!-- LEAVE MODAL -->
+<div class="modal-bg" id="leave-modal">
+  <div class="modal">
+    <h3>新增請假紀錄 <button class="modal-x" onclick="closeLeaveModal()">×</button></h3>
+    <div class="form-row"><label>員工</label>
+      <select id="lv-staff" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);font-family:var(--font)">
+        <option value="蔡頭">蔡頭</option>
+      </select>
+    </div>
+    <div class="form-row"><label>日期</label><input type="date" id="lv-date"/></div>
+    <div class="form-row"><label>小時數</label><input type="number" id="lv-hours" step="0.5" min="0.5" max="8" placeholder="例：8（全天）、4（半天）"/></div>
+    <div class="form-row"><label>備註（可不填）</label><input id="lv-note" placeholder="例：家庭事由"/></div>
+    <button class="save-btn" onclick="saveLeave()">儲存</button>
+  </div>
 </div>
 
 <!-- VIEWER -->
@@ -1364,8 +1411,8 @@ function switchPage(name,btn){
   document.getElementById('page-'+name).classList.add('active');
   btn.classList.add('active');
   if(name==='todo'){loadInventory().then(()=>renderTodo());}
-  if(name==='company')loadLogos();
   if(name==='logs')renderLogs();
+  if(name==='goals')loadGoalsPage();
 }
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2200);}
 function shareCard(type){
@@ -1517,6 +1564,201 @@ async function deleteInventory(id){
   await sb.from('inventory').delete().eq('id',id);
   inventory=inventory.filter(i=>i.id!==id);
   renderTodo();
+}
+
+// ─── GOALS & LEAVE ───────────────────────────────────────────────
+const TIERS=[
+  {min:0,      max:2600000, label:'260萬以下', rate:0,    color:'#B4B2A9'},
+  {min:2600000,max:3000000, label:'260～300萬',rate:0.02, color:'#378ADD'},
+  {min:3000000,max:3400000, label:'300～340萬',rate:0.035,color:'#639922'},
+  {min:3400000,max:Infinity,label:'340萬以上', rate:0.05, color:'#E24B4A'},
+];
+const PERIOD_MONTHS=[[1,2,3,4],[5,6,7,8],[9,10,11,12]];
+const LEAVE_TOTAL_HOURS=80; // 10天×8小時
+
+let revenueEntries=[];
+let leaveRecords=[];
+let currentStaff='蔡頭';
+
+function getCurrentPeriod(){
+  const m=new Date().getMonth()+1;
+  return PERIOD_MONTHS.find(p=>p.includes(m))||PERIOD_MONTHS[0];
+}
+
+function getPeriodLabel(period){
+  const y=new Date().getFullYear();
+  return `${y}年 ${period[0]}月－${period[period.length-1]}月 結算期`;
+}
+
+async function loadGoalsPage(){
+  await Promise.all([loadRevenueEntries(),loadLeaveRecords()]);
+  renderGoals();
+  renderLeave();
+}
+
+async function loadRevenueEntries(){
+  const{data,error}=await sb.from('revenue_entries').select('*').order('entry_date',{ascending:true});
+  if(!error)revenueEntries=data||[];
+}
+
+async function loadLeaveRecords(){
+  const{data,error}=await sb.from('leave_records').select('*').order('leave_date',{ascending:false});
+  if(!error)leaveRecords=data||[];
+}
+
+function renderGoals(){
+  const period=getCurrentPeriod();
+  const y=new Date().getFullYear();
+  // Filter entries in current period
+  const periodEntries=revenueEntries.filter(e=>{
+    const d=new Date(e.entry_date);
+    return d.getFullYear()===y && period.includes(d.getMonth()+1);
+  });
+  const total=periodEntries.reduce((s,e)=>s+Number(e.amount),0);
+  const maxGoal=3400000;
+  const pct=Math.min(total/maxGoal*100,100);
+  // Current tier
+  const curTier=TIERS.slice().reverse().find(t=>total>=t.min)||TIERS[0];
+  const nextTier=TIERS.find(t=>t.min>total);
+
+  document.getElementById('goal-period-label').textContent=getPeriodLabel(period);
+
+  // Progress bar
+  document.getElementById('goal-progress-area').innerHTML=`
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" style="width:${pct}%;background:${curTier.color}"></div>
+    </div>
+    <div class="progress-label">
+      累計 <strong>NT$ ${total.toLocaleString()}</strong>
+      ${nextTier?` ／ 距下一門檻還差 NT$ ${(nextTier.min-total).toLocaleString()}`:'🎉 已達最高門檻！'}
+    </div>`;
+
+  // Tier badges
+  document.getElementById('goal-tiers').innerHTML=TIERS.map(t=>`
+    <div class="tier-badge ${curTier===t?'active-tier':''}">
+      <div style="font-weight:700;color:${t.color}">${(t.rate*100).toFixed(1)}%</div>
+      <div style="color:var(--text2);margin-top:2px">${t.label}</div>
+    </div>`).join('');
+
+  // Monthly groups
+  const byMonth={};
+  period.forEach(m=>byMonth[m]=[]);
+  periodEntries.forEach(e=>{
+    const m=new Date(e.entry_date).getMonth()+1;
+    if(byMonth[m])byMonth[m].push(e);
+  });
+  document.getElementById('goal-months-area').innerHTML=period.map(m=>{
+    const items=byMonth[m]||[];
+    const mTotal=items.reduce((s,e)=>s+Number(e.amount),0);
+    return`<div class="month-group">
+      <div class="month-label"><span>${m}月</span><span style="color:var(--text)">${mTotal>0?'NT$ '+mTotal.toLocaleString():''}</span></div>
+      ${items.length?items.map(e=>`
+        <div class="month-entry">
+          <span>${e.label}</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--blue);font-weight:500">NT$ ${Number(e.amount).toLocaleString()}</span>
+            <button class="entry-del" onclick="deleteRevenue('${e.id}')">✕</button>
+          </span>
+        </div>`).join(''):`<div style="font-size:11px;color:var(--text3);padding:4px 0">尚無紀錄</div>`}
+    </div>`;
+  }).join('');
+}
+
+function openRevenueModal(){
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('rv-date').value=today;
+  document.getElementById('rv-label').value='';
+  document.getElementById('rv-amount').value='';
+  document.getElementById('revenue-modal').classList.add('open');
+}
+function closeRevenueModal(){
+  document.getElementById('revenue-modal').classList.remove('open');
+}
+async function saveRevenue(){
+  const date=document.getElementById('rv-date').value;
+  const label=document.getElementById('rv-label').value.trim();
+  const amount=parseInt(document.getElementById('rv-amount').value);
+  if(!date||!label||!amount||amount<=0){showToast('請填寫所有欄位');return;}
+  const{error}=await sb.from('revenue_entries').insert({entry_date:date,label,amount});
+  if(error){showToast('儲存失敗');return;}
+  closeRevenueModal();
+  await loadRevenueEntries();
+  renderGoals();
+  showToast('已新增成交金額');
+}
+async function deleteRevenue(id){
+  if(!confirm('確定刪除這筆紀錄？'))return;
+  await sb.from('revenue_entries').delete().eq('id',id);
+  await loadRevenueEntries();
+  renderGoals();
+  showToast('已刪除');
+}
+
+// ── LEAVE ──
+function selectStaff(name,btn){
+  currentStaff=name;
+  document.querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLeave();
+}
+
+function renderLeave(){
+  const staffRecords=leaveRecords.filter(r=>r.staff_name===currentStaff);
+  const usedHours=staffRecords.reduce((s,r)=>s+Number(r.hours),0);
+  const remaining=LEAVE_TOTAL_HOURS-usedHours;
+
+  document.getElementById('leave-summary').innerHTML=`
+    <div class="leave-summary-box">
+      <div><div class="leave-stat-val">${LEAVE_TOTAL_HOURS}</div><div class="leave-stat-lbl">總時數（hr）</div></div>
+      <div><div class="leave-stat-val" style="color:var(--red)">${usedHours}</div><div class="leave-stat-lbl">已用（hr）</div></div>
+      <div><div class="leave-stat-val" style="color:var(--green)">${remaining}</div><div class="leave-stat-lbl">剩餘（hr）</div></div>
+    </div>`;
+
+  document.getElementById('leave-list').innerHTML=staffRecords.length?
+    staffRecords.map(r=>`
+      <div class="leave-entry">
+        <span>
+          <span style="color:var(--text2);margin-right:6px">${r.leave_date}</span>
+          ${r.note?`<span>${r.note}</span>`:''}
+        </span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="font-weight:600;color:var(--red)">−${r.hours}hr</span>
+          <button class="entry-del" onclick="deleteLeave('${r.id}')">✕</button>
+        </span>
+      </div>`).join('')
+    :'<div style="font-size:11px;color:var(--text3);padding:8px 0;text-align:center">尚無請假紀錄</div>';
+}
+
+function openLeaveModal(){
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('lv-date').value=today;
+  document.getElementById('lv-staff').value=currentStaff;
+  document.getElementById('lv-hours').value='';
+  document.getElementById('lv-note').value='';
+  document.getElementById('leave-modal').classList.add('open');
+}
+function closeLeaveModal(){
+  document.getElementById('leave-modal').classList.remove('open');
+}
+async function saveLeave(){
+  const staff=document.getElementById('lv-staff').value;
+  const date=document.getElementById('lv-date').value;
+  const hours=parseFloat(document.getElementById('lv-hours').value);
+  const note=document.getElementById('lv-note').value.trim();
+  if(!date||!hours||hours<=0){showToast('請填寫日期與小時數');return;}
+  const{error}=await sb.from('leave_records').insert({staff_name:staff,leave_date:date,hours,note});
+  if(error){showToast('儲存失敗');return;}
+  closeLeaveModal();
+  await loadLeaveRecords();
+  renderLeave();
+  showToast('已新增請假紀錄');
+}
+async function deleteLeave(id){
+  if(!confirm('確定刪除這筆紀錄？'))return;
+  await sb.from('leave_records').delete().eq('id',id);
+  await loadLeaveRecords();
+  renderLeave();
+  showToast('已刪除');
 }
 
 initAuth();

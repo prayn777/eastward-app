@@ -253,12 +253,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     </div>
     <div class="goal-card" style="margin-top:10px">
       <div class="goal-section-title">🗓 特休紀錄</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="staff-btn active" id="staff-btn-蔡頭" onclick="selectStaff('蔡頭',this)">蔡頭</button>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <button class="staff-btn" id="staff-btn-蔡頭" onclick="toggleLeave('蔡頭',this)">蔡頭 ▸</button>
       </div>
-      <div id="leave-summary"></div>
-      <div id="leave-list"></div>
-      <button class="add-btn" onclick="openLeaveModal()">＋ 新增請假紀錄</button>
+      <div id="leave-detail" style="display:none;margin-top:10px">
+        <div id="leave-summary"></div>
+        <div id="leave-list"></div>
+        <button class="add-btn" onclick="openLeaveModal()">＋ 新增請假紀錄</button>
+      </div>
     </div>
   </div>
 
@@ -1593,7 +1595,7 @@ function getPeriodLabel(period){
 async function loadGoalsPage(){
   await Promise.all([loadRevenueEntries(),loadLeaveRecords()]);
   renderGoals();
-  renderLeave();
+  // leave section starts collapsed, renderLeave called on expand
 }
 
 async function loadRevenueEntries(){
@@ -1679,8 +1681,12 @@ async function saveRevenue(){
   const label=document.getElementById('rv-label').value.trim();
   const amount=parseInt(document.getElementById('rv-amount').value);
   if(!date||!label||!amount||amount<=0){showToast('請填寫所有欄位');return;}
-  const{error}=await sb.from('revenue_entries').insert({entry_date:date,label,amount});
-  if(error){showToast('儲存失敗');return;}
+  const{data,error}=await sb.from('revenue_entries').insert({entry_date:date,label,amount}).select();
+  if(error){
+    console.error('revenue insert error:',error);
+    showToast('儲存失敗：'+error.message);
+    return;
+  }
   closeRevenueModal();
   await loadRevenueEntries();
   renderGoals();
@@ -1695,11 +1701,24 @@ async function deleteRevenue(id){
 }
 
 // ── LEAVE ──
-function selectStaff(name,btn){
-  currentStaff=name;
-  document.querySelectorAll('.staff-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderLeave();
+let leaveExpanded=false;
+function toggleLeave(name,btn){
+  if(leaveExpanded && currentStaff===name){
+    // collapse
+    leaveExpanded=false;
+    btn.classList.remove('active');
+    btn.textContent=name+' ▸';
+    document.getElementById('leave-detail').style.display='none';
+  } else {
+    // expand
+    leaveExpanded=true;
+    currentStaff=name;
+    document.querySelectorAll('.staff-btn').forEach(b=>{b.classList.remove('active');b.textContent=b.id.replace('staff-btn-','')+' ▸';});
+    btn.classList.add('active');
+    btn.textContent=name+' ▾';
+    document.getElementById('leave-detail').style.display='block';
+    renderLeave();
+  }
 }
 
 function renderLeave(){

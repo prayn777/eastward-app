@@ -68,7 +68,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .phase-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--card);cursor:pointer;user-select:none}
 .phase-header-left{display:flex;align-items:center;gap:8px}
 .phase-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.dot-1{background:#378ADD}.dot-2{background:#639922}.dot-3{background:#1D9E75}
+.dot-1{background:#378ADD}.dot-2{background:#639922}.dot-3{background:#1D9E75}.dot-closed{background:#B4B2A9}
 .phase-title{font-size:13px;font-weight:700;color:var(--text)}
 .phase-count{font-size:11px;color:var(--text3);background:var(--bg);padding:2px 7px;border-radius:10px}
 .phase-chevron{font-size:14px;color:var(--text3);transition:transform 0.2s;line-height:1}
@@ -345,12 +345,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         <option value="待清潔">待清潔</option>
         <option value="待交車">待交車</option>
       </optgroup>
+      <optgroup label="完成">
+        <option value="已結案">已結案</option>
+      </optgroup>
     </select>
   </div>
   <div class="form-row"><label>總報價（NT$）</label><input id="e-price"/></div>
   <div class="form-row"><label>付訂金日期</label><input type="date" id="e-deposit"/></div>
   <div class="form-row"><label>🪵 板材</label><input id="e-material" placeholder="例：12mm 夾板、白橡木貼皮…"/></div>
   <div class="form-row" id="site-date-row" style="display:none"><label>📅 預計到現場日</label><input type="date" id="e-site-date"/></div>
+  <div class="form-row" id="draw-fee-row" style="display:none"><label>🖊 付繪圖費日期</label><input type="date" id="e-draw-fee-date"/></div>
   <div class="form-row">
     <label>報價單圖片（可上傳多張，例如截圖兩頁）</label>
     <input type="file" id="e-quote" accept="image/*" multiple onchange="handleQuoteSelect()"/>
@@ -407,7 +411,7 @@ const P1_STAGES=['接洽中','待討論','待繪圖','待報價','等現場'];
 const P2_STAGES=['木工階段','白鐵階段','電路','裝飾貼圖'];
 const P3_STAGES=['待清潔','待交車'];
 // open state: default p2 open, p1&p3 open too
-const phaseOpen={p1:true,p2:true,p3:true};
+const phaseOpen={p1:true,p2:true,p3:true,p4:false};
 
 let cards=[],logos=[],editingId=null,editingLogoId=null,currentUser=null;
 let editPendingQuote=null,editPending3D=[];
@@ -473,7 +477,8 @@ async function loadCards(){
       buys:c.buys?c.buys.split('\n').filter(Boolean):[],
       images3d:c.images3d&&c.images3d!=='[]'&&c.images3d!=='null'?tryParseJSON(c.images3d):[],
       material:c.material||'',
-      site_date:c.site_date||null
+      site_date:c.site_date||null,
+      draw_fee_date:c.draw_fee_date||null
     }));
     renderSchedule();
     if(document.getElementById('page-todo').classList.contains('active'))renderTodo();
@@ -525,6 +530,7 @@ async function saveEdit(){
     deposit:document.getElementById('e-deposit').value||null,
     material:document.getElementById('e-material').value.trim(),
     site_date:document.getElementById('e-site-date').value||null,
+    draw_fee_date:document.getElementById('e-draw-fee-date').value||null,
     todos:document.getElementById('e-todo').value.trim(),
     buys:document.getElementById('e-buy').value.trim(),
     images3d:JSON.stringify(allImgs)};
@@ -705,10 +711,22 @@ function renderSchedule(){
   const p2c=cards.filter(c=>P2_STAGES.includes(c.stage)).length;
   const p3c=cards.filter(c=>P3_STAGES.includes(c.stage)).length;
 
+  const closedCards=cards.filter(c=>c.stage==='已結案');
+  const closedHtml=closedCards.length
+    ?closedCards.map(c=>`<div style="padding:8px 10px;background:var(--card);border-radius:8px;border:1px solid var(--border);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text)">${c.name}</div>
+        ${c.price?`<div style="font-size:10px;color:var(--text2);margin-top:2px">NT$ ${c.price}</div>`:''}
+        ${c.material?`<div style="font-size:10px;color:var(--text2)">🪵 ${c.material}</div>`:''}
+      </div>
+      <button style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:var(--font);color:var(--text2)" onclick="openEdit('${c.id}')">✏️</button>
+    </div>`).join('')
+    :'<div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">尚無結案專案</div>';
   con.innerHTML=`
     ${renderPhaseBlock('p1','dot-1','第一階段',p1c,renderKanban(P1_STAGES,'p1'))}
     ${renderPhaseBlock('p2','dot-2','第二階段',p2c,renderFullStages(P2_STAGES))}
     ${renderPhaseBlock('p3','dot-3','第三階段',p3c,renderKanban(P3_STAGES,'p3'))}
+    ${renderPhaseBlock('p4','dot-closed','已結案',closedCards.length,closedHtml)}
     <button class="add-btn" onclick="openModal('modal-add')">＋ 新增業主專案</button>
   `;
   // bind drag for full cards
@@ -760,12 +778,20 @@ function renderMiniCard(c,phaseId){
   const badge=c.deposit?urgBadge(d):'';
   const materialHtml=c.material?`<div style="font-size:10px;color:var(--text2);margin-top:3px">🪵 ${c.material}</div>`:'';
   const siteDateHtml=(c.stage==='等現場'&&c.site_date)?`<div style="font-size:10px;color:var(--amber);margin-top:2px">📅 到現場：${c.site_date}</div>`:'';
+  let drawFeeHtml='';
+  if(c.stage==='待繪圖'&&c.draw_fee_date){
+    const df=daysSince(c.draw_fee_date);
+    const dfColor=df>=0?'var(--red)':'var(--text2)';
+    const dfText=df<0?`還有${Math.abs(df)}天付繪圖費`:df===0?'今天付繪圖費':`已付繪圖費${df}天`;
+    drawFeeHtml=`<div style="font-size:10px;color:${dfColor};margin-top:2px">🖊 ${dfText}</div>`;
+  }
   return`<div class="mini-card${cls}" data-id="${c.id}" draggable="true"
     ontouchstart="touchStart(event,'${c.id}','kanban')" ontouchmove="touchMove(event)" ontouchend="touchEnd(event,'kanban')">
     <div class="mini-card-name">${c.name}</div>
     ${badge}
     ${materialHtml}
     ${siteDateHtml}
+    ${drawFeeHtml}
     <div class="mini-card-edit" onclick="openEdit('${c.id}')">✏️ 編輯</div>
     <div class="mini-card-hint">⠿ 長按拖曳</div>
   </div>`;
@@ -1097,11 +1123,13 @@ function openEdit(id){
   document.getElementById('e-deposit').value=c.deposit||'';
   document.getElementById('e-material').value=c.material||'';
   document.getElementById('e-site-date').value=c.site_date||'';
-  // 只有「等現場」才顯示預計到現場日
+  document.getElementById('e-draw-fee-date').value=c.draw_fee_date||'';
+  // 只有「等現場」才顯示預計到現場日；只有「待繪圖」才顯示付繪圖費日期
   document.getElementById('site-date-row').style.display=(c.stage==='等現場')?'block':'none';
-  // 切換階段時動態顯示/隱藏
+  document.getElementById('draw-fee-row').style.display=(c.stage==='待繪圖')?'block':'none';
   document.getElementById('e-stage').onchange=function(){
     document.getElementById('site-date-row').style.display=(this.value==='等現場')?'block':'none';
+    document.getElementById('draw-fee-row').style.display=(this.value==='待繪圖')?'block':'none';
   };
   document.getElementById('e-todo').value=c.todos.join('\n');
   _editTodos=c.todos.length?parseTodos(c.todos):[];
@@ -1649,19 +1677,34 @@ function renderGoals(){
     const m=new Date(e.entry_date).getMonth()+1;
     if(byMonth[m])byMonth[m].push(e);
   });
+  const curMonth=new Date().getMonth()+1;
   document.getElementById('goal-months-area').innerHTML=period.map(m=>{
     const items=byMonth[m]||[];
     const mTotal=items.reduce((s,e)=>s+Number(e.amount),0);
+    const isOpen=(m===curMonth);
     return`<div class="month-group">
-      <div class="month-label"><span>${m}月</span><span style="color:var(--text)">${mTotal>0?'NT$ '+mTotal.toLocaleString():''}</span></div>
-      ${items.length?items.map(e=>`
-        <div class="month-entry">
-          <span>${e.label}</span>
-          <span style="display:flex;align-items:center;gap:6px">
-            <span style="color:var(--blue);font-weight:500">NT$ ${Number(e.amount).toLocaleString()}</span>
-            <button class="entry-del" onclick="deleteRevenue('${e.id}')">✕</button>
-          </span>
-        </div>`).join(''):`<div style="font-size:11px;color:var(--text3);padding:4px 0">尚無紀錄</div>`}
+      <div class="month-label" style="cursor:pointer;user-select:none" onclick="toggleMonthGroup(${m},this)">
+        <span style="display:flex;align-items:center;gap:5px">
+          <span id="mchev-${m}" style="font-size:10px;color:var(--text3)">${isOpen?'▾':'▸'}</span>
+          <span>${m}月</span>
+          ${items.length?`<span style="font-size:10px;color:var(--text3);background:var(--bg);padding:1px 6px;border-radius:8px">${items.length}筆</span>`:''}
+        </span>
+        <span style="color:var(--text)">${mTotal>0?'NT$ '+mTotal.toLocaleString():''}</span>
+      </div>
+      <div id="mgroup-${m}" style="display:${isOpen?'block':'none'}">
+        ${items.length?items.map(e=>`
+          <div class="month-entry">
+            <span>
+              <span style="color:var(--text2);font-size:10px;margin-right:4px">${e.entry_date}</span>
+              ${e.label}
+            </span>
+            <span style="display:flex;align-items:center;gap:4px">
+              <span style="color:var(--blue);font-weight:500">NT$ ${Number(e.amount).toLocaleString()}</span>
+              <button class="entry-del" title="編輯" onclick="openEditRevenue('${e.id}','${e.entry_date}',\`${e.label}\`,${e.amount})">✏️</button>
+              <button class="entry-del" title="刪除" onclick="deleteRevenue('${e.id}')">✕</button>
+            </span>
+          </div>`).join(''):`<div style="font-size:11px;color:var(--text3);padding:4px 0">尚無紀錄</div>`}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1674,6 +1717,8 @@ function openRevenueModal(){
   document.getElementById('revenue-modal').classList.add('open');
 }
 function closeRevenueModal(){
+  _editingRevenueId=null;
+  document.getElementById('revenue-modal').querySelector('h3').innerHTML='新增成交金額 <button class="modal-x" onclick="closeRevenueModal()">×</button>';
   document.getElementById('revenue-modal').classList.remove('open');
 }
 async function saveRevenue(){
@@ -1681,17 +1726,38 @@ async function saveRevenue(){
   const label=document.getElementById('rv-label').value.trim();
   const amount=parseInt(document.getElementById('rv-amount').value);
   if(!date||!label||!amount||amount<=0){showToast('請填寫所有欄位');return;}
-  const{data,error}=await sb.from('revenue_entries').insert({entry_date:date,label,amount}).select();
-  if(error){
-    console.error('revenue insert error:',error);
-    showToast('儲存失敗：'+error.message);
-    return;
+  let error;
+  if(_editingRevenueId){
+    ({error}=await sb.from('revenue_entries').update({entry_date:date,label,amount}).eq('id',_editingRevenueId));
+  } else {
+    ({error}=await sb.from('revenue_entries').insert({entry_date:date,label,amount}));
   }
+  if(error){console.error('revenue error:',error);showToast('儲存失敗：'+error.message);return;}
+  _editingRevenueId=null;
   closeRevenueModal();
   await loadRevenueEntries();
   renderGoals();
-  showToast('已新增成交金額');
+  showToast(_editingRevenueId?'已更新':'已新增成交金額');
 }
+function toggleMonthGroup(m,headerEl){
+  const body=document.getElementById('mgroup-'+m);
+  const chev=document.getElementById('mchev-'+m);
+  if(!body)return;
+  const isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  chev.textContent=isOpen?'▸':'▾';
+}
+
+let _editingRevenueId=null;
+function openEditRevenue(id,date,label,amount){
+  _editingRevenueId=id;
+  document.getElementById('rv-date').value=date;
+  document.getElementById('rv-label').value=label;
+  document.getElementById('rv-amount').value=amount;
+  document.getElementById('revenue-modal').querySelector('h3').innerHTML='編輯成交金額 <button class="modal-x" onclick="closeRevenueModal()">×</button>';
+  document.getElementById('revenue-modal').classList.add('open');
+}
+
 async function deleteRevenue(id){
   if(!confirm('確定刪除這筆紀錄？'))return;
   await sb.from('revenue_entries').delete().eq('id',id);
@@ -1740,14 +1806,25 @@ function renderLeave(){
           <span style="color:var(--text2);margin-right:6px">${r.leave_date}</span>
           ${r.note?`<span>${r.note}</span>`:''}
         </span>
-        <span style="display:flex;align-items:center;gap:6px">
+        <span style="display:flex;align-items:center;gap:4px">
           <span style="font-weight:600;color:var(--red)">−${r.hours}hr</span>
-          <button class="entry-del" onclick="deleteLeave('${r.id}')">✕</button>
+          <button class="entry-del" title="編輯" onclick="openEditLeave('${r.id}','${r.staff_name}','${r.leave_date}',${r.hours},'${(r.note||'').replace(/'/g,'')}')">✏️</button>
+          <button class="entry-del" title="刪除" onclick="deleteLeave('${r.id}')">✕</button>
         </span>
       </div>`).join('')
     :'<div style="font-size:11px;color:var(--text3);padding:8px 0;text-align:center">尚無請假紀錄</div>';
 }
 
+let _editingLeaveId=null;
+function openEditLeave(id,staff,date,hours,note){
+  _editingLeaveId=id;
+  document.getElementById('lv-staff').value=staff;
+  document.getElementById('lv-date').value=date;
+  document.getElementById('lv-hours').value=hours;
+  document.getElementById('lv-note').value=note;
+  document.getElementById('leave-modal').querySelector('h3').innerHTML='編輯請假紀錄 <button class="modal-x" onclick="closeLeaveModal()">×</button>';
+  document.getElementById('leave-modal').classList.add('open');
+}
 function openLeaveModal(){
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('lv-date').value=today;
@@ -1757,6 +1834,8 @@ function openLeaveModal(){
   document.getElementById('leave-modal').classList.add('open');
 }
 function closeLeaveModal(){
+  _editingLeaveId=null;
+  document.getElementById('leave-modal').querySelector('h3').innerHTML='新增請假紀錄 <button class="modal-x" onclick="closeLeaveModal()">×</button>';
   document.getElementById('leave-modal').classList.remove('open');
 }
 async function saveLeave(){
@@ -1765,12 +1844,17 @@ async function saveLeave(){
   const hours=parseFloat(document.getElementById('lv-hours').value);
   const note=document.getElementById('lv-note').value.trim();
   if(!date||!hours||hours<=0){showToast('請填寫日期與小時數');return;}
-  const{error}=await sb.from('leave_records').insert({staff_name:staff,leave_date:date,hours,note});
-  if(error){showToast('儲存失敗');return;}
+  let error;
+  if(_editingLeaveId){
+    ({error}=await sb.from('leave_records').update({staff_name:staff,leave_date:date,hours,note}).eq('id',_editingLeaveId));
+  } else {
+    ({error}=await sb.from('leave_records').insert({staff_name:staff,leave_date:date,hours,note}));
+  }
+  if(error){showToast('儲存失敗：'+error.message);return;}
   closeLeaveModal();
   await loadLeaveRecords();
   renderLeave();
-  showToast('已新增請假紀錄');
+  showToast(_editingLeaveId?'已更新':'已新增請假紀錄');
 }
 async function deleteLeave(id){
   if(!confirm('確定刪除這筆紀錄？'))return;

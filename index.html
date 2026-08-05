@@ -252,11 +252,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <button class="add-btn" onclick="openRevenueModal()">＋ 新增成交金額</button>
     </div>
     <div class="goal-card" style="margin-top:10px">
-      <div class="goal-section-title">🗓 特休紀錄</div>
-      <div style="display:flex;gap:8px;margin-bottom:4px">
-        <button class="staff-btn" id="staff-btn-蔡頭" onclick="toggleLeave('蔡頭',this)">蔡頭 ▸</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="goal-section-title" style="margin-bottom:0">🗓 特休紀錄</div>
+        <button style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-family:var(--font);color:var(--text2)" onclick="openAddStaffModal()">＋ 新增人員</button>
       </div>
-      <div id="leave-detail" style="display:none;margin-top:10px">
+      <div id="staff-btn-area" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px"></div>
+      <div id="leave-detail" style="display:none;margin-top:12px">
+        <!-- year switcher -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <button style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text2)" onclick="shiftYear(-1)">‹</button>
+          <span id="leave-year-label" style="font-size:13px;font-weight:600;color:var(--text)"></span>
+          <button style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text2)" onclick="shiftYear(1)">›</button>
+        </div>
         <div id="leave-summary"></div>
         <div id="leave-list"></div>
         <button class="add-btn" onclick="openLeaveModal()">＋ 新增請假紀錄</button>
@@ -288,14 +295,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   <div class="modal">
     <h3>新增請假紀錄 <button class="modal-x" onclick="closeLeaveModal()">×</button></h3>
     <div class="form-row"><label>員工</label>
-      <select id="lv-staff" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);font-family:var(--font)">
-        <option value="蔡頭">蔡頭</option>
-      </select>
+      <select id="lv-staff" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);font-family:var(--font)"></select>
+    </div>
+    <div class="form-row"><label>年度</label>
+      <select id="lv-period" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);font-family:var(--font)"></select>
     </div>
     <div class="form-row"><label>日期</label><input type="date" id="lv-date"/></div>
     <div class="form-row"><label>小時數</label><input type="number" id="lv-hours" step="0.5" min="0.5" max="8" placeholder="例：8（全天）、4（半天）"/></div>
     <div class="form-row"><label>備註（可不填）</label><input id="lv-note" placeholder="例：家庭事由"/></div>
     <button class="save-btn" onclick="saveLeave()">儲存</button>
+  </div>
+</div>
+
+<!-- ADD STAFF MODAL -->
+<div class="modal-bg" id="add-staff-modal">
+  <div class="modal">
+    <h3>新增人員 <button class="modal-x" onclick="closeAddStaffModal()">×</button></h3>
+    <div class="form-row"><label>姓名</label><input id="as-name" placeholder="例：小明"/></div>
+    <div class="form-row"><label>年度</label><input id="as-period" placeholder="例：2026-2027"/></div>
+    <div class="form-row"><label>特休總時數（hr）</label><input type="number" id="as-hours" value="80" min="1"/></div>
+    <button class="save-btn" onclick="saveNewStaff()">新增</button>
   </div>
 </div>
 
@@ -778,19 +797,22 @@ function renderMiniCard(c,phaseId){
   const badge=c.deposit?urgBadge(d):'';
   const materialHtml=c.material?`<div style="font-size:10px;color:var(--text2);margin-top:3px">🪵 ${c.material}</div>`:'';
   const siteDateHtml=(c.stage==='等現場'&&c.site_date)?`<div style="font-size:10px;color:var(--amber);margin-top:2px">📅 到現場：${c.site_date}</div>`:'';
-  let drawFeeBadge='';
+  let drawFeeHtml='';
   if(c.stage==='待繪圖'&&c.draw_fee_date){
-    const df=daysSince(c.draw_fee_date);
-    const dfColor=df<0?'var(--text2)':df===0?'var(--amber)':'var(--red)';
-    const dfText=df<0?`${Math.abs(df)}天`:df===0?'今天':`${df}天`;
-    drawFeeBadge=`<span style="font-size:10px;color:${dfColor};font-weight:700;margin-left:5px">${dfText}</span>`;
+    const df=daysSince(c.draw_fee_date); // positive = past, negative = future
+    let dfColor,dfText;
+    if(df<0){dfColor='var(--text2)';dfText=`還有${Math.abs(df)}天`;}
+    else if(df===0){dfColor='var(--amber)';dfText='今天付繪圖費';}
+    else{dfColor='var(--red)';dfText=`已過${df}天`;}
+    drawFeeHtml=`<div style="font-size:10px;color:${dfColor};margin-top:3px;display:flex;align-items:center;gap:3px">🖊 繪圖費 <span style="font-weight:700">${dfText}</span></div>`;
   }
   return`<div class="mini-card${cls}" data-id="${c.id}" draggable="true"
     ontouchstart="touchStart(event,'${c.id}','kanban')" ontouchmove="touchMove(event)" ontouchend="touchEnd(event,'kanban')">
-    <div class="mini-card-name" style="display:flex;align-items:center">${c.name}${drawFeeBadge}</div>
+    <div class="mini-card-name">${c.name}</div>
     ${badge}
     ${materialHtml}
     ${siteDateHtml}
+    ${drawFeeHtml}
     <div class="mini-card-edit" onclick="openEdit('${c.id}')">✏️ 編輯</div>
     <div class="mini-card-hint">⠿ 長按拖曳</div>
   </div>`;
@@ -1603,11 +1625,11 @@ const TIERS=[
   {min:3400000,max:Infinity,label:'340萬以上', rate:0.05, color:'#E24B4A'},
 ];
 const PERIOD_MONTHS=[[1,2,3,4],[5,6,7,8],[9,10,11,12]];
-const LEAVE_TOTAL_HOURS=80; // 10天×8小時
-
 let revenueEntries=[];
 let leaveRecords=[];
+let leaveQuotas=[];
 let currentStaff='蔡頭';
+let currentYearPeriod='2026-2027';
 
 function getCurrentPeriod(){
   const m=new Date().getMonth()+1;
@@ -1620,8 +1642,9 @@ function getPeriodLabel(period){
 }
 
 async function loadGoalsPage(){
-  await Promise.all([loadRevenueEntries(),loadLeaveRecords()]);
+  await Promise.all([loadRevenueEntries(),loadLeaveRecords(),loadLeaveQuotas()]);
   renderGoals();
+  renderStaffButtons();
   // leave section starts collapsed, renderLeave called on expand
 }
 
@@ -1633,6 +1656,21 @@ async function loadRevenueEntries(){
 async function loadLeaveRecords(){
   const{data,error}=await sb.from('leave_records').select('*').order('leave_date',{ascending:false});
   if(!error)leaveRecords=data||[];
+}
+
+async function loadLeaveQuotas(){
+  const{data,error}=await sb.from('leave_quotas').select('*').order('staff_name');
+  if(!error)leaveQuotas=data||[];
+}
+
+function renderStaffButtons(){
+  // Get unique staff names from quotas
+  const staffNames=[...new Set(leaveQuotas.map(q=>q.staff_name))];
+  const area=document.getElementById('staff-btn-area');
+  if(!area)return;
+  area.innerHTML=staffNames.map(name=>
+    `<button class="staff-btn${name===currentStaff&&document.getElementById('leave-detail').style.display!=='none'?' active':''}" id="staff-btn-${name}" onclick="toggleLeave('${name}',this)">${name} ▸</button>`
+  ).join('');
 }
 
 function renderGoals(){
@@ -1769,37 +1807,60 @@ async function deleteRevenue(id){
 let leaveExpanded=false;
 function toggleLeave(name,btn){
   if(leaveExpanded && currentStaff===name){
-    // collapse
     leaveExpanded=false;
-    btn.classList.remove('active');
-    btn.textContent=name+' ▸';
+    renderStaffButtons();
     document.getElementById('leave-detail').style.display='none';
   } else {
-    // expand
     leaveExpanded=true;
     currentStaff=name;
-    document.querySelectorAll('.staff-btn').forEach(b=>{b.classList.remove('active');b.textContent=b.id.replace('staff-btn-','')+' ▸';});
-    btn.classList.add('active');
-    btn.textContent=name+' ▾';
+    // Set default year: find most recent period for this staff
+    const staffPeriods=leaveQuotas.filter(q=>q.staff_name===name).map(q=>q.year_period).sort();
+    if(staffPeriods.length) currentYearPeriod=staffPeriods[staffPeriods.length-1];
+    renderStaffButtons();
+    // update active btn
+    document.querySelectorAll('.staff-btn').forEach(b=>{
+      const n=b.id.replace('staff-btn-','');
+      b.classList.toggle('active', n===name);
+      b.textContent=n==name?n+' ▾':n+' ▸';
+    });
     document.getElementById('leave-detail').style.display='block';
     renderLeave();
   }
 }
 
+function shiftYear(dir){
+  const staffPeriods=leaveQuotas.filter(q=>q.staff_name===currentStaff).map(q=>q.year_period).sort();
+  const idx=staffPeriods.indexOf(currentYearPeriod);
+  const newIdx=idx+dir;
+  if(newIdx>=0&&newIdx<staffPeriods.length){
+    currentYearPeriod=staffPeriods[newIdx];
+    renderLeave();
+  }
+}
+
 function renderLeave(){
-  const staffRecords=leaveRecords.filter(r=>r.staff_name===currentStaff);
-  const usedHours=staffRecords.reduce((s,r)=>s+Number(r.hours),0);
-  const remaining=LEAVE_TOTAL_HOURS-usedHours;
+  const quota=leaveQuotas.find(q=>q.staff_name===currentStaff&&q.year_period===currentYearPeriod);
+  const totalHours=quota?Number(quota.total_hours):80;
+  const staffPeriods=leaveQuotas.filter(q=>q.staff_name===currentStaff).map(q=>q.year_period).sort();
+  const idx=staffPeriods.indexOf(currentYearPeriod);
+
+  // year label with nav arrows disabled state
+  const lbl=document.getElementById('leave-year-label');
+  if(lbl) lbl.textContent=currentYearPeriod+' 年度';
+
+  const periodRecords=leaveRecords.filter(r=>r.staff_name===currentStaff&&r.year_period===currentYearPeriod);
+  const usedHours=periodRecords.reduce((s,r)=>s+Number(r.hours),0);
+  const remaining=totalHours-usedHours;
 
   document.getElementById('leave-summary').innerHTML=`
     <div class="leave-summary-box">
-      <div><div class="leave-stat-val">${LEAVE_TOTAL_HOURS}</div><div class="leave-stat-lbl">總時數（hr）</div></div>
+      <div><div class="leave-stat-val">${totalHours}</div><div class="leave-stat-lbl">總時數（hr）</div></div>
       <div><div class="leave-stat-val" style="color:var(--red)">${usedHours}</div><div class="leave-stat-lbl">已用（hr）</div></div>
       <div><div class="leave-stat-val" style="color:var(--green)">${remaining}</div><div class="leave-stat-lbl">剩餘（hr）</div></div>
     </div>`;
 
-  document.getElementById('leave-list').innerHTML=staffRecords.length?
-    staffRecords.map(r=>`
+  document.getElementById('leave-list').innerHTML=periodRecords.length?
+    periodRecords.map(r=>`
       <div class="leave-entry">
         <span>
           <span style="color:var(--text2);margin-right:6px">${r.leave_date}</span>
@@ -1807,7 +1868,7 @@ function renderLeave(){
         </span>
         <span style="display:flex;align-items:center;gap:4px">
           <span style="font-weight:600;color:var(--red)">−${r.hours}hr</span>
-          <button class="entry-del" title="編輯" onclick="openEditLeave('${r.id}','${r.staff_name}','${r.leave_date}',${r.hours},'${(r.note||'').replace(/'/g,'')}')">✏️</button>
+          <button class="entry-del" title="編輯" onclick="openEditLeave('${r.id}','${r.staff_name}','${r.leave_date}',${r.hours},'${(r.note||'').replace(/'/g,'')}','${r.year_period}')">✏️</button>
           <button class="entry-del" title="刪除" onclick="deleteLeave('${r.id}')">✕</button>
         </span>
       </div>`).join('')
@@ -1815,9 +1876,23 @@ function renderLeave(){
 }
 
 let _editingLeaveId=null;
-function openEditLeave(id,staff,date,hours,note){
+function populateLeaveSelects(selStaff,selPeriod){
+  // Staff options
+  const staffNames=[...new Set(leaveQuotas.map(q=>q.staff_name))];
+  const staffSel=document.getElementById('lv-staff');
+  staffSel.innerHTML=staffNames.map(n=>`<option value="${n}"${n===selStaff?' selected':''}>${n}</option>`).join('');
+  // Period options based on selected staff
+  function updatePeriods(staff){
+    const periods=leaveQuotas.filter(q=>q.staff_name===staff).map(q=>q.year_period).sort();
+    const perSel=document.getElementById('lv-period');
+    perSel.innerHTML=periods.map(p=>`<option value="${p}"${p===selPeriod?' selected':''}>${p}</option>`).join('');
+  }
+  updatePeriods(selStaff);
+  staffSel.onchange=function(){updatePeriods(this.value);};
+}
+function openEditLeave(id,staff,date,hours,note,period){
   _editingLeaveId=id;
-  document.getElementById('lv-staff').value=staff;
+  populateLeaveSelects(staff,period||currentYearPeriod);
   document.getElementById('lv-date').value=date;
   document.getElementById('lv-hours').value=hours;
   document.getElementById('lv-note').value=note;
@@ -1826,34 +1901,61 @@ function openEditLeave(id,staff,date,hours,note){
 }
 function openLeaveModal(){
   const today=new Date().toISOString().slice(0,10);
+  _editingLeaveId=null;
+  populateLeaveSelects(currentStaff,currentYearPeriod);
   document.getElementById('lv-date').value=today;
-  document.getElementById('lv-staff').value=currentStaff;
   document.getElementById('lv-hours').value='';
   document.getElementById('lv-note').value='';
+  document.getElementById('leave-modal').querySelector('h3').innerHTML='新增請假紀錄 <button class="modal-x" onclick="closeLeaveModal()">×</button>';
   document.getElementById('leave-modal').classList.add('open');
 }
 function closeLeaveModal(){
   _editingLeaveId=null;
-  document.getElementById('leave-modal').querySelector('h3').innerHTML='新增請假紀錄 <button class="modal-x" onclick="closeLeaveModal()">×</button>';
   document.getElementById('leave-modal').classList.remove('open');
 }
 async function saveLeave(){
   const staff=document.getElementById('lv-staff').value;
+  const year_period=document.getElementById('lv-period').value;
   const date=document.getElementById('lv-date').value;
   const hours=parseFloat(document.getElementById('lv-hours').value);
   const note=document.getElementById('lv-note').value.trim();
   if(!date||!hours||hours<=0){showToast('請填寫日期與小時數');return;}
   let error;
   if(_editingLeaveId){
-    ({error}=await sb.from('leave_records').update({staff_name:staff,leave_date:date,hours,note}).eq('id',_editingLeaveId));
+    ({error}=await sb.from('leave_records').update({staff_name:staff,year_period,leave_date:date,hours,note}).eq('id',_editingLeaveId));
   } else {
-    ({error}=await sb.from('leave_records').insert({staff_name:staff,leave_date:date,hours,note}));
+    ({error}=await sb.from('leave_records').insert({staff_name:staff,year_period,leave_date:date,hours,note}));
   }
   if(error){showToast('儲存失敗：'+error.message);return;}
+  // sync currentYearPeriod with what was saved
+  currentStaff=staff; currentYearPeriod=year_period;
   closeLeaveModal();
   await loadLeaveRecords();
   renderLeave();
   showToast(_editingLeaveId?'已更新':'已新增請假紀錄');
+}
+
+// Add new staff + quota
+function openAddStaffModal(){
+  document.getElementById('as-name').value='';
+  document.getElementById('as-period').value='';
+  document.getElementById('as-hours').value='80';
+  document.getElementById('add-staff-modal').classList.add('open');
+}
+function closeAddStaffModal(){
+  document.getElementById('add-staff-modal').classList.remove('open');
+}
+async function saveNewStaff(){
+  const name=document.getElementById('as-name').value.trim();
+  const period=document.getElementById('as-period').value.trim();
+  const hours=parseFloat(document.getElementById('as-hours').value);
+  if(!name||!period||!hours){showToast('請填寫所有欄位');return;}
+  const{error}=await sb.from('leave_quotas').upsert({staff_name:name,year_period:period,total_hours:hours});
+  if(error){showToast('新增失敗：'+error.message);return;}
+  closeAddStaffModal();
+  await loadLeaveQuotas();
+  renderStaffButtons();
+  showToast(`已新增 ${name} ${period} 年度`);
 }
 async function deleteLeave(id){
   if(!confirm('確定刪除這筆紀錄？'))return;

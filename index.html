@@ -1843,7 +1843,7 @@ function renderLeave(){
 
   // year label with nav arrows disabled state
   const lbl=document.getElementById('leave-year-label');
-  if(lbl) lbl.textContent=currentYearPeriod+' 年度';
+  if(lbl) lbl.textContent=currentYearPeriod;
 
   const periodRecords=leaveRecords.filter(r=>r.staff_name===currentStaff&&r.year_period===currentYearPeriod);
   const usedHours=periodRecords.reduce((s,r)=>s+Number(r.hours),0);

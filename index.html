@@ -433,7 +433,7 @@ const P3_STAGES=['待清潔','待交車'];
 const phaseOpen={p1:true,p2:true,p3:true,p4:false};
 
 let cards=[],logos=[],editingId=null,editingLogoId=null,currentUser=null;
-let editPendingQuote=null,editPending3D=[];
+let editPendingQuote=null,editPending3D=[],editKeptImgs=[];
 
 // ── AUTH ─────────────────────────────────────────────────────
 async function signInWithGoogle(){
@@ -542,7 +542,8 @@ async function saveEdit(){
   const btn=document.getElementById('edit-save-btn');
   btn.textContent='儲存中…';btn.disabled=true;
   const orig=cards.find(c=>c.id===editingId);
-  const allImgs=[...(orig?.images3d||[]),...editPending3D];
+  // 如果有新上傳就覆蓋，否則保留原有（扣除已刪除的）
+  const allImgs=editPending3D.length>0?editPending3D:editKeptImgs;
   const upd={name,
     stage:document.getElementById('e-stage').value,
     price:document.getElementById('e-price').value.trim(),
@@ -556,7 +557,7 @@ async function saveEdit(){
   if(editPendingQuote!=null)upd.quote_url=editPendingQuote;
   await sb.from('cards').update(upd).eq('id',editingId);
   btn.textContent='儲存';btn.disabled=false;
-  editPendingQuote=null;editPending3D=[];
+  editPendingQuote=null;editPending3D=[];editKeptImgs=[];
   const savedCard=cards.find(c=>c.id===editingId);writeLog('儲存編輯',savedCard?.name||name,'更新專案資料');closeModal('modal-edit');showToast('已儲存');
 }
 
@@ -707,6 +708,23 @@ async function handle3DSelect(){
   document.getElementById('e-3d-prog').style.display='none';
   renderEditPending3D();showToast('上傳完成 '+files.length+' 張');
 }
+function render3DCurrentImgs(){
+  const e3dCon=document.getElementById('e-3d-current');
+  if(!e3dCon)return;
+  if(editKeptImgs.length){
+    e3dCon.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">目前${editKeptImgs.length}張（點 × 可個別刪除）：</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${editKeptImgs.map((u,i)=>`
+          <div style="position:relative">
+            <img src="${u}" style="width:56px;height:56px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="viewImageArr(editKeptImgs,${i})">
+            <button onclick="editKeptImgs.splice(${i},1);render3DCurrentImgs()" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font)">×</button>
+          </div>`).join('')}
+      </div>`;
+  } else {
+    e3dCon.innerHTML='<div style="font-size:11px;color:var(--text3)">尚無3D圖片</div>';
+  }
+}
+
 function renderEditPending3D(){
   document.getElementById('e-3d-preview').innerHTML=editPending3D.map((u,i)=>`
     <div class="uploaded-tag"><img src="${u}" style="width:18px;height:18px;object-fit:cover;border-radius:3px" onclick="viewImage('${u}')"> 圖${i+1}
@@ -1122,7 +1140,7 @@ function copyLogoUrl(id){copyLogoImg(id);}
 
 // ── EDIT MODAL ────────────────────────────────────────────────
 function openEdit(id){
-  editingId=id;editPendingQuote=null;editPending3D=[];
+  editingId=id;editPendingQuote=null;editPending3D=[];editKeptImgs=[];
   // 完整清空 AI 和報價單狀態
   window._pendingQuoteFiles=null;
   window._pendingQuoteUrls=null;
@@ -1168,15 +1186,8 @@ function openEdit(id){
     qCurCon.innerHTML='';
   }
   const imgs=Array.isArray(c.images3d)?c.images3d:(c.images3d&&typeof c.images3d==='string'&&c.images3d!=='[]'&&c.images3d!=='null'?tryParseJSON(c.images3d):[]);
-  const e3dCon=document.getElementById('e-3d-current');
-  if(imgs.length){
-    e3dCon.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:4px">目前${imgs.length}張：</div><div style="display:flex;gap:5px;flex-wrap:wrap">${imgs.map((u,i)=>`<img src="${u}" data-editidx="${i}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer">`).join('')}</div>`;
-    e3dCon.querySelectorAll('img').forEach(img=>img.addEventListener('click',()=>{
-      viewImageArr(imgs,parseInt(img.dataset.editidx));
-    }));
-  } else {
-    e3dCon.innerHTML='';
-  }
+  editKeptImgs=[...imgs];
+  render3DCurrentImgs();
   openModal('modal-edit');
 }
 
